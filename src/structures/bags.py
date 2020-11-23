@@ -160,7 +160,7 @@ class BagDataset(Dataset):
         return bag_dataset.__add__(self)
 
     def centroids(self):
-        bags = self.unstack()
+        bags = self.unstack(inplace=False)
         centroids = [np.mean(x, axis=0) for x in bags]
         return centroids
 
