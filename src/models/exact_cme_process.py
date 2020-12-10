@@ -20,12 +20,13 @@ class ExactCMEProcess(ExactGP):
             used for individuals GP prior
         bag_kernel (gpytorch.kernels.Kernel): kernel module used for bag values
         bags_sizes (list[int]): sizes of bags used
+        lbda (float): inversion regularization parameter
         likelihood (gpytorch.likelihoods.Likelihood): observation noise likelihood model
 
     """
     def __init__(self, train_individuals, train_bags, train_aggregate_targets,
                  individuals_mean, individuals_kernel,
-                 bag_kernel, bags_sizes, likelihood):
+                 bag_kernel, bags_sizes, lbda, likelihood):
         super().__init__(train_inputs=train_bags,
                          train_targets=train_aggregate_targets,
                          likelihood=likelihood)
@@ -34,6 +35,7 @@ class ExactCMEProcess(ExactGP):
         self.individuals_kernel = individuals_kernel
         self.bag_kernel = bag_kernel
         self.bags_sizes = bags_sizes
+        self.lbda = lbda
         self.extended_train_bags = torch.cat([torch.ones(bag_size) * bag_value
                                               for (bag_size, bag_value) in zip(bags_sizes, train_bags)])
 
@@ -63,7 +65,8 @@ class ExactCMEProcess(ExactGP):
 
         # Compute precision matrix of bags values
         bags_covar = self.bag_kernel(self.extended_train_bags)
-        inverse_bags_covar = bags_covar.add_jitter().inv_matmul(torch.eye(*bags_covar.shape))
+        foo = bags_covar.add_diag(self.lbda * len(self.extended_train_bags) * torch.ones_like(self.extended_train_bags))
+        inverse_bags_covar = foo.inv_matmul(torch.eye(*bags_covar.shape))
         return latent_individuals_mean, latent_individuals_covar, inverse_bags_covar
 
     def update_cme_estimate_parameters(self):
