@@ -41,19 +41,19 @@ class ExactCMEProcess(ExactGP):
                                               for (bag_size, bag_value) in zip(bags_sizes, train_bags)])
 
         # Evaluate tensors needed to compute CME estimate
-        latent_individuals_mean, latent_individuals_covar, inverse_bags_covar = self._get_cme_estimate_parameters()
+        latent_individuals_mean, latent_individuals_covar, root_inv_bags_covar = self._get_cme_estimate_parameters()
 
         # Initialize CME aggregate mean and covariance functions
         mean_module_kwargs = {'bag_kernel': self.bag_kernel,
                               'bags_values': self.extended_train_bags,
                               'individuals_mean': latent_individuals_mean,
-                              'inverse_bags_covar': inverse_bags_covar}
+                              'root_inv_bags_covar': root_inv_bags_covar}
         self.mean_module = CMEAggregateMean(**mean_module_kwargs)
 
         covar_module_kwargs = {'bag_kernel': self.bag_kernel,
                                'bags_values': self.extended_train_bags,
                                'individuals_covar': latent_individuals_covar,
-                               'inverse_bags_covar': inverse_bags_covar}
+                               'root_inv_bags_covar': root_inv_bags_covar}
         self.covar_module = CMEAggregateKernel(**covar_module_kwargs)
 
         # Initialize individuals posterior prediction strategy attribute
@@ -82,19 +82,19 @@ class ExactCMEProcess(ExactGP):
         # Compute precision matrix of bags values
         bags_covar = self.bag_kernel(self.extended_train_bags)
         foo = bags_covar.add_diag(self.lbda * len(self.extended_train_bags) * torch.ones_like(self.extended_train_bags))
-        inverse_bags_covar = foo.inv_matmul(torch.eye(*bags_covar.shape))
-        return latent_individuals_mean, latent_individuals_covar, inverse_bags_covar
+        root_inv_bags_covar = foo.root_inv_decomposition().root
+        return latent_individuals_mean, latent_individuals_covar, root_inv_bags_covar
 
     def update_cme_estimate_parameters(self):
         """Update values of parameters used for CME estimate in mean and
             covariance modules
 
         """
-        latent_individuals_mean, latent_individuals_covar, inverse_bags_covar = self._get_cme_estimate_parameters()
+        latent_individuals_mean, latent_individuals_covar, root_inv_bags_covar = self._get_cme_estimate_parameters()
         self.mean_module.individuals_mean = latent_individuals_mean
-        self.mean_module.inverse_bags_covar = inverse_bags_covar
+        self.mean_module.root_inv_bags_covar = root_inv_bags_covar
         self.covar_module.individuals_covar = latent_individuals_covar
-        self.covar_module.inverse_bags_covar = inverse_bags_covar
+        self.covar_module.root_inv_bags_covar = root_inv_bags_covar
 
     def forward(self, inputs):
         """CME Process Prior computation
@@ -129,8 +129,9 @@ class ExactCMEProcess(ExactGP):
         individuals_covar_map = self.individuals_kernel(individuals, self.train_individuals)
         bags_covar = self.bag_kernel(self.train_bags, self.extended_train_bags)
 
-        foo = individuals_covar_map.matmul(self.covar_module.inverse_bags_covar)
-        output = bags_covar.matmul(foo.t()).t()
+        foo = individuals_covar_map.matmul(self.covar_module.root_inv_bags_covar)
+        bar = bags_covar.matmul(self.covar_module.root_inv_bags_covar)
+        output = foo.matmul(bar.t())
         return output
 
     def predict(self, individuals):

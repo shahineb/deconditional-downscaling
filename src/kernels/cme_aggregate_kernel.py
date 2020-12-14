@@ -10,15 +10,16 @@ class CMEAggregateKernel(kernels.Kernel):
         bags_values (torch.Tensor): (N,) or (N, d) tensor of bags used for CME estimation
         individuals_covar (gpytorch.lazy.LazyTensor, torch.Tensor): (N, N) tensor of individuals
             covariance matrix used for CME estimation
-        inverse_bags_covar (gpytorch.lazy.LazyTensor, torch.Tensor): (N, N) inverse covariance
-            or precision matrix of bags use for CME estimation
+        root_inv_bags_covar (gpytorch.lazy.LazyTensor, torch.Tensor): (N, ?) usually
+            low-rank square root decomposition of inverse covariance
+            or precision matrix of bags used for CME estimation
     """
-    def __init__(self, bag_kernel, bags_values, individuals_covar, inverse_bags_covar):
+    def __init__(self, bag_kernel, bags_values, individuals_covar, root_inv_bags_covar):
         super().__init__()
         self.bag_kernel = bag_kernel
         self.bags_values = bags_values
         self.individuals_covar = individuals_covar
-        self.inverse_bags_covar = inverse_bags_covar
+        self.root_inv_bags_covar = root_inv_bags_covar
 
     def forward(self, x1, x2, **kwargs):
         """Computes CME aggregate covariance matrix
@@ -59,11 +60,11 @@ class CMEAggregateKernel(kernels.Kernel):
             type: torch.Tensor (N1, N2) tensor of CME aggregate covariance
 
         """
-        # Normalize left and right terms with inverse bag covariance matrix
-        foo_1 = bags_to_x1_covar.t().matmul(self.inverse_bags_covar)
-        foo_2 = bags_to_x2_covar.t().matmul(self.inverse_bags_covar)
+        # Normalize left and right terms with inverse root bag covariance matrix
+        foo_1 = bags_to_x1_covar.t().matmul(self.root_inv_bags_covar)
+        foo_2 = self.root_inv_bags_covar.t().matmul(bags_to_x2_covar)
 
         # Aggregate individuals covariances with normalized bags covariance terms
-        output = self.individuals_covar.matmul(foo_2.t())
-        output = foo_1.matmul(output)
+        bar = self.root_inv_bags_covar.t() @ self.individuals_covar @ self.root_inv_bags_covar
+        output = foo_1 @ bar @ foo_2
         return output

@@ -9,16 +9,17 @@ class CMEAggregateMean(means.Mean):
         bags_values (torch.Tensor): (N,) or (N, d) tensor of bags used for CME estimation
         individuals_mean (gpytorch.lazy.LazyTensor, torch.Tensor): (N, ) tensor of individuals
             mean used for CME estimation
-        inverse_bags_covar (gpytorch.lazy.LazyTensor, torch.Tensor): (N, N) inverse covariance
+        root_inv_bags_covar (gpytorch.lazy.LazyTensor, torch.Tensor): (N, ?) usually
+            low-rank square root decomposition of inverse covariance
             or precision matrix of bags used for CME estimation
 
     """
-    def __init__(self, bag_kernel, bags_values, individuals_mean, inverse_bags_covar):
+    def __init__(self, bag_kernel, bags_values, individuals_mean, root_inv_bags_covar):
         super().__init__()
         self.bag_kernel = bag_kernel
         self.bags_values = bags_values
         self.individuals_mean = individuals_mean
-        self.inverse_bags_covar = inverse_bags_covar
+        self.root_inv_bags_covar = root_inv_bags_covar
 
     def forward(self, x):
         """Compute CME aggregate mean
@@ -48,6 +49,7 @@ class CMEAggregateMean(means.Mean):
         Returns:
             type: (torch.Tensor): (N',) tensor of CME aggregate mean
         """
-        foo = bag_to_x_covar.t().matmul(self.inverse_bags_covar)
-        output = foo.mv(self.individuals_mean)
+        foo = bag_to_x_covar.t().matmul(self.root_inv_bags_covar)
+        bar = self.root_inv_bags_covar.t().matmul(self.individuals_mean)
+        output = foo.matmul(bar)
         return output
