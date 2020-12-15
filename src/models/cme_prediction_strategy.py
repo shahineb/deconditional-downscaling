@@ -6,17 +6,17 @@ from gpytorch.utils.memoize import cached, clear_cache_hook
 
 
 class ExactCMEPredictionStrategy(DefaultPredictionStrategy):
-    """Short summary.
+    """Implements computation of predictive posterior on individuals distribution
 
     Args:
-        train_individuals (type): Description of parameter `train_individuals`.
-        extended_train_bags (type): Description of parameter `extended_train_bags`.
-        train_aggregate_prior_dist (type): Description of parameter `train_aggregate_prior_dist`.
-        train_aggregate_targets (type): Description of parameter `train_aggregate_targets`.
-        likelihood (type): Description of parameter `likelihood`.
-
-    Attributes:
-        train_individuals
+        train_individuals (torch.Tensor): (N, d) tensor of individuals inputs used
+            for training
+        extended_train_bags (torch.Tensor): (N, r) tensor of bags values used for training
+        train_aggregate_prior_dist (gpytorch.distribution.MultivariateNormal): CME process
+            prior distribution on training samples
+        train_aggregate_targets (torch.Tensor): (n,) tensor of aggregate values
+        observed for each bag
+        likelihood (gpytorch.likelihoods.Likelihood): observation noise likelihood model
 
     """
     def __init__(self, train_individuals, extended_train_bags, train_aggregate_prior_dist,

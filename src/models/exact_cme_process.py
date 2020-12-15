@@ -37,8 +37,8 @@ class ExactCMEProcess(ExactGP):
         self.bag_kernel = bag_kernel
         self.bags_sizes = bags_sizes
         self.lbda = lbda
-        self.extended_train_bags = torch.cat([torch.ones(bag_size) * bag_value
-                                              for (bag_size, bag_value) in zip(bags_sizes, train_bags)])
+        self.extended_train_bags = torch.cat([bag_value.repeat(bag_size, 1)
+                                              for (bag_size, bag_value) in zip(bags_sizes, train_bags)]).squeeze()
 
         # Evaluate tensors needed to compute CME estimate
         latent_individuals_mean, latent_individuals_covar, root_inv_bags_covar = self._get_cme_estimate_parameters()
@@ -81,7 +81,7 @@ class ExactCMEProcess(ExactGP):
 
         # Compute precision matrix of bags values
         bags_covar = self.bag_kernel(self.extended_train_bags)
-        foo = bags_covar.add_diag(self.lbda * len(self.extended_train_bags) * torch.ones_like(self.extended_train_bags))
+        foo = bags_covar.add_diag(self.lbda * len(self.extended_train_bags) * torch.ones(len(self.extended_train_bags)))
         root_inv_bags_covar = foo.root_inv_decomposition().root
         return latent_individuals_mean, latent_individuals_covar, root_inv_bags_covar
 
