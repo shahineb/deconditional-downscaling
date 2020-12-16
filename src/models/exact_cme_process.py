@@ -1,12 +1,10 @@
-import torch
 from gpytorch.models import ExactGP
 from gpytorch.distributions import MultivariateNormal
-from src.means import CMEAggregateMean
-from src.kernels import CMEAggregateKernel
+from .cme_process import CMEProcess
 from .cme_prediction_strategy import ExactCMEPredictionStrategy
 
 
-class ExactCMEProcess(ExactGP):
+class ExactCMEProcess(ExactGP, CMEProcess):
     """Class implementing exact formulation of CME Process, suitable for small datasets
 
     Args:
@@ -28,38 +26,28 @@ class ExactCMEProcess(ExactGP):
     def __init__(self, train_individuals, train_bags, train_aggregate_targets,
                  individuals_mean, individuals_kernel,
                  bag_kernel, bags_sizes, lbda, likelihood):
+
+        # Initialize exact GP model attributes
         super().__init__(train_inputs=train_bags,
                          train_targets=train_aggregate_targets,
                          likelihood=likelihood)
-        self.train_individuals = train_individuals
-        self.individuals_mean = individuals_mean
-        self.individuals_kernel = individuals_kernel
-        self.bag_kernel = bag_kernel
-        self.bags_sizes = bags_sizes
-        self.lbda = lbda
-        self.extended_train_bags = torch.cat([bag_value.repeat(bag_size, 1)
-                                              for (bag_size, bag_value) in zip(bags_sizes, train_bags)]).squeeze()
 
-        # Evaluate tensors needed to compute CME estimate
-        latent_individuals_mean, latent_individuals_covar, root_inv_bags_covar = self._get_cme_estimate_parameters()
-
-        # Initialize CME aggregate mean and covariance functions
-        mean_module_kwargs = {'bag_kernel': self.bag_kernel,
-                              'bags_values': self.extended_train_bags,
-                              'individuals_mean': latent_individuals_mean,
-                              'root_inv_bags_covar': root_inv_bags_covar}
-        self.mean_module = CMEAggregateMean(**mean_module_kwargs)
-
-        covar_module_kwargs = {'bag_kernel': self.bag_kernel,
-                               'bags_values': self.extended_train_bags,
-                               'individuals_covar': latent_individuals_covar,
-                               'root_inv_bags_covar': root_inv_bags_covar}
-        self.covar_module = CMEAggregateKernel(**covar_module_kwargs)
+        # Initialize CME model parameters
+        self._init_model_parameters(train_individuals=train_individuals,
+                                    train_bags=train_bags,
+                                    train_aggregate_targets=train_aggregate_targets,
+                                    individuals_mean=individuals_mean,
+                                    individuals_kernel=individuals_kernel,
+                                    bag_kernel=bag_kernel,
+                                    bags_sizes=bags_sizes,
+                                    lbda=lbda)
 
         # Initialize individuals posterior prediction strategy attribute
         self.individuals_prediction_strategy = None
 
     def setup_individuals_prediction_strategy(self):
+        """Defines computational strategy for deriving predictive posterior on individuals
+        """
         train_aggregate_prior_dist = self.forward(self.train_bags)
         individuals_prediction_strategy_kwargs = {'train_individuals': self.train_individuals,
                                                   'extended_train_bags': self.extended_train_bags,
@@ -67,34 +55,6 @@ class ExactCMEProcess(ExactGP):
                                                   'train_aggregate_targets': self.train_aggregate_targets,
                                                   'likelihood': self.likelihood}
         self.individuals_prediction_strategy = ExactCMEPredictionStrategy(**individuals_prediction_strategy_kwargs)
-
-    def _get_cme_estimate_parameters(self):
-        """Computes tensors required to get an estimation of the CME
-
-        Returns:
-            type: torch.Tensor, gpytorch.lazy.LazyTensor, gpytorch.lazy.LazyTensor
-
-        """
-        # Evaluate underlying GP mean and covariance on individuals
-        latent_individuals_mean = self.individuals_mean(self.train_individuals)
-        latent_individuals_covar = self.individuals_kernel(self.train_individuals)
-
-        # Compute precision matrix of bags values
-        bags_covar = self.bag_kernel(self.extended_train_bags)
-        foo = bags_covar.add_diag(self.lbda * len(self.extended_train_bags) * torch.ones(len(self.extended_train_bags)))
-        root_inv_bags_covar = foo.root_inv_decomposition().root
-        return latent_individuals_mean, latent_individuals_covar, root_inv_bags_covar
-
-    def update_cme_estimate_parameters(self):
-        """Update values of parameters used for CME estimate in mean and
-            covariance modules
-
-        """
-        latent_individuals_mean, latent_individuals_covar, root_inv_bags_covar = self._get_cme_estimate_parameters()
-        self.mean_module.individuals_mean = latent_individuals_mean
-        self.mean_module.root_inv_bags_covar = root_inv_bags_covar
-        self.covar_module.individuals_covar = latent_individuals_covar
-        self.covar_module.root_inv_bags_covar = root_inv_bags_covar
 
     def forward(self, inputs):
         """CME Process Prior computation
@@ -115,25 +75,6 @@ class ExactCMEProcess(ExactGP):
                                                 covariance_matrix=covar)
         return prior_distribution
 
-    def _get_individuals_to_aggregate_covar(self, individuals):
-        """Computes covariance between latent individuals GP evaluated on input
-            and CME aggregate process GP distribution on train data
-
-        Args:
-            individuals (torch.Tensor): input individuals
-
-        Returns:
-            type: torch.Tensor
-
-        """
-        individuals_covar_map = self.individuals_kernel(individuals, self.train_individuals)
-        bags_covar = self.bag_kernel(self.train_bags, self.extended_train_bags)
-
-        foo = individuals_covar_map.matmul(self.covar_module.root_inv_bags_covar)
-        bar = bags_covar.matmul(self.covar_module.root_inv_bags_covar)
-        output = foo.matmul(bar.t())
-        return output
-
     def predict(self, individuals):
         """Run prediction of individuals posterior distribution
 
@@ -152,23 +93,15 @@ class ExactCMEProcess(ExactGP):
         individuals_covar = self.individuals_kernel(individuals)
 
         # Compute covariance of latent individual with CME aggregate process
-        individuals_to_aggregate_covar = self._get_individuals_to_aggregate_covar(individuals)
+        individuals_to_cme_covar = self.get_individuals_to_cme_covar(individuals)
 
         # Compute predictive mean and covariance
         individuals_posterior_mean = self.individuals_prediction_strategy.exact_predictive_mean(individuals_mean=individuals_mean,
-                                                                                                individuals_to_train_bags_covar=individuals_to_aggregate_covar)
+                                                                                                individuals_to_cme_covar=individuals_to_cme_covar)
         individuals_posterior_covar = self.individuals_prediction_strategy.exact_predictive_covar(individuals_covar=individuals_covar,
-                                                                                                  individuals_to_train_bags_covar=individuals_to_aggregate_covar)
+                                                                                                  individuals_to_cme_covar=individuals_to_cme_covar)
 
         # Encapsulate as gaussian vector
         individuals_posterior = MultivariateNormal(mean=individuals_posterior_mean,
                                                    covariance_matrix=individuals_posterior_covar)
         return individuals_posterior
-
-    @property
-    def train_bags(self):
-        return self.train_inputs[0]
-
-    @property
-    def train_aggregate_targets(self):
-        return self.train_targets

@@ -83,42 +83,42 @@ class ExactCMEPredictionStrategy(DefaultPredictionStrategy):
         return cache_input
 
     def exact_prediction(self, individuals_mean, individuals_covar,
-                         individuals_to_train_bags_covar):
+                         individuals_to_cme_covar):
         """Compute exact predictive mean and covariance given input test individuals
 
         Args:
             individuals_mean (torch.Tensor)
             individuals_covar (torch.Tensor, gpytorch.lazy.LazyTensor)
-            individuals_to_train_bags_covar (torch.Tensor, gpytorch.lazy.LazyTensor)
+            individuals_to_cme_covar (torch.Tensor, gpytorch.lazy.LazyTensor)
 
         Returns:
             type: torch.Tensor, gpytorch.lazy.LazyTensor
 
         """
-        return (self.exact_predictive_mean(individuals_mean, individuals_to_train_bags_covar),
-                self.exact_predictive_covar(individuals_covar, individuals_to_train_bags_covar))
+        return (self.exact_predictive_mean(individuals_mean, individuals_to_cme_covar),
+                self.exact_predictive_covar(individuals_covar, individuals_to_cme_covar))
 
-    def exact_predictive_mean(self, individuals_mean, individuals_to_train_bags_covar):
+    def exact_predictive_mean(self, individuals_mean, individuals_to_cme_covar):
         """Computes exact predictive mean given input test individuals
 
         Args:
             individuals_mean (torch.Tensor)
-            individuals_to_train_bags_covar (torch.Tensor, gpytorch.lazy.LazyTensor)
+            individuals_to_cme_covar (torch.Tensor, gpytorch.lazy.LazyTensor)
 
         Returns:
             type: torch.Tensor
 
         """
-        output = (individuals_to_train_bags_covar @ self.posterior_mean_correction_cache.unsqueeze(-1)).squeeze(-1)
+        output = (individuals_to_cme_covar @ self.posterior_mean_correction_cache.unsqueeze(-1)).squeeze(-1)
         output = output + individuals_mean
         return output
 
-    def exact_predictive_covar(self, individuals_covar, individuals_to_train_bags_covar):
+    def exact_predictive_covar(self, individuals_covar, individuals_to_cme_covar):
         """Computes exact predictive covariance given input test individuals
 
         Args:
             individuals_covar (torch.Tensor, gpytorch.lazy.LazyTensor)
-            individuals_to_train_bags_covar (torch.Tensor, gpytorch.lazy.LazyTensor)
+            individuals_to_cme_covar (torch.Tensor, gpytorch.lazy.LazyTensor)
 
         Returns:
             type: gpytorch.lazy.LazyTensor
@@ -126,11 +126,11 @@ class ExactCMEPredictionStrategy(DefaultPredictionStrategy):
         """
         # Full computation without using cached matrix
         if settings.fast_pred_var.off():
-            output = self._compute_predictive_covar(individuals_covar, individuals_to_train_bags_covar)
+            output = self._compute_predictive_covar(individuals_covar, individuals_to_cme_covar)
 
         # Using cached inverse square root covariance matrix
         else:
-            covar_inv_quad_form_root = self.covar_cache.matmul(individuals_to_train_bags_covar)
+            covar_inv_quad_form_root = self.covar_cache.matmul(individuals_to_cme_covar)
             if torch.is_tensor(individuals_covar):
                 output = torch.add(individuals_covar, covar_inv_quad_form_root @ covar_inv_quad_form_root.transpose(-1, -2), alpha=-1)
                 output = lazy.lazify(output)
@@ -138,41 +138,41 @@ class ExactCMEPredictionStrategy(DefaultPredictionStrategy):
                 output = individuals_covar + lazy.MatmulLazyTensor(covar_inv_quad_form_root, covar_inv_quad_form_root.transpose(-1, -2).mul(-1))
         return output
 
-    def _compute_predictive_covar(self, individuals_covar, individuals_to_train_bags_covar):
+    def _compute_predictive_covar(self, individuals_covar, individuals_to_cme_covar):
         """Runs full computation of exact predictive covariance matrix as efficiently
         as possible depending on input data type
 
         Args:
             individuals_covar (torch.Tensor, gpytorch.lazy.LazyTensor)
-            individuals_to_train_bags_covar (torch.Tensor, gpytorch.lazy.LazyTensor)
+            individuals_to_cme_covar (torch.Tensor, gpytorch.lazy.LazyTensor)
 
         Returns:
             type: gpytorch.lazy.LazyTensor
 
         """
-        # Derive noisy model prior covariance on training bags
+        # Derive noisy model prior covariance of cme on training bags
         mvn = self.train_prior_dist.__class__(
             torch.zeros_like(self.train_prior_dist.mean), self.train_prior_dist.lazy_covariance_matrix
         )
         if settings.detach_test_caches.on():
-            train_bags_covar = self.likelihood(mvn, self.train_inputs).lazy_covariance_matrix.detach()
+            train_cme_aggregate_covar = self.likelihood(mvn, self.train_inputs).lazy_covariance_matrix.detach()
         else:
-            train_bags_covar = self.likelihood(mvn, self.train_inputs).lazy_covariance_matrix
+            train_cme_aggregate_covar = self.likelihood(mvn, self.train_inputs).lazy_covariance_matrix
 
         # Compute inverse model covariance X train bags to individuals covariance
-        individuals_to_train_bags_covar = lazy.delazify(individuals_to_train_bags_covar)
-        covar_correction_rhs = train_bags_covar.inv_matmul(individuals_to_train_bags_covar.transpose(-1, -2))
+        individuals_to_cme_covar = lazy.delazify(individuals_to_cme_covar)
+        covar_correction_rhs = train_cme_aggregate_covar.inv_matmul(individuals_to_cme_covar.transpose(-1, -2))
 
         # For efficiency
         if torch.is_tensor(individuals_covar):
             # We can use addmm in the 2d case
             if individuals_covar.dim() == 2:
-                output = torch.addmm(individuals_covar, individuals_to_train_bags_covar, covar_correction_rhs, beta=1, alpha=-1)
+                output = torch.addmm(individuals_covar, individuals_to_cme_covar, covar_correction_rhs, beta=1, alpha=-1)
                 output = lazy.lazify(output)
             else:
-                output = lazy.lazify(individuals_covar + individuals_to_train_bags_covar @ covar_correction_rhs.mul(-1))
+                output = lazy.lazify(individuals_covar + individuals_to_cme_covar @ covar_correction_rhs.mul(-1))
 
         # In other cases - we'll use the standard infrastructure
         else:
-            output = individuals_covar + lazy.MatmulLazyTensor(individuals_to_train_bags_covar, covar_correction_rhs.mul(-1))
+            output = individuals_covar + lazy.MatmulLazyTensor(individuals_to_cme_covar, covar_correction_rhs.mul(-1))
         return output

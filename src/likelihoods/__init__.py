@@ -1,3 +1,3 @@
-from .gaussian_bag_likelihood import GaussianBagLikelihood
+from .cme_process_likelihood import CMEProcessLikelihood
 
-__all__ = ['GaussianBagLikelihood']
+__all__ = ['CMEProcessLikelihood']
