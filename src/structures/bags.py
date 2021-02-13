@@ -6,6 +6,11 @@ class BagDataset(Dataset):
     """Utility class to work with bagged data. Every bag is assumed to have the
     same dimensionality and a given aggregate label
 
+    # TODO :
+        - rename attribute
+        - allow use of torch tensors
+        - allow individuals to be fed as numpy array with bags sizes
+
     Args:
         bags (list[np.ndarray]): list of bags of features with size [(bag_size, dim)]
         labels (list, np.ndarray): labels associated to each bag with size (Σ bag_sizes)

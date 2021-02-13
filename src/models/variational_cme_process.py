@@ -1,55 +1,55 @@
+import torch
 from gpytorch import distributions
 from gpytorch.models import ApproximateGP
-from gpytorch.variational import CholeskyVariationalDistribution
-from gpytorch.variational import VariationalStrategy
+from gpytorch import variational
 from .cme_process import CMEProcess
+from src.variational import VariationalStrategy
 
 
 class VariationalCMEProcess(ApproximateGP, CMEProcess):
-    """Approximate variational GP with inducing points module
+    """Sparse variational CME Process
 
     Args:
-        landmark_points (torch.Tensor): tensor of landmark points from which to
-            compute inducing points
-        mean_module (gpytorch.means.Mean): mean module to compute mean vectors on inputs samples
-        covar_module (gpytorch.kernels.Kernel): kernel module to compute covar matrix on input samples
+        inducing_points (torch.Tensor): tensor of landmark points from which to
+            compute inducing values
+        individuals_mean (gpytorch.means.Mean): mean module used for
+            individuals GP prior
+        individuals_kernel (gpytorch.kernels.Kernel): covariance module
+            used for individuals GP prior
+        bag_kernel (gpytorch.kernels.Kernel): kernel module used for bag values
+        lbda (float): inversion regularization parameter
     """
-    def __init__(self, landmark_points, train_individuals, train_bags, train_aggregate_targets,
-                 individuals_mean, individuals_kernel, bag_kernel, bags_sizes, lbda):
-
+    def __init__(self, inducing_points, individuals_mean, individuals_kernel,
+                 bag_kernel, lbda):
         # Initialize variational strategy
-        variational_strategy = self._set_variational_strategy(landmark_points)
+        variational_strategy = self._set_variational_strategy(inducing_points)
         super().__init__(variational_strategy=variational_strategy)
 
-        # Initialize CME model parameters
-        self._init_model_parameters(train_individuals=train_individuals,
-                                    train_bags=train_bags,
-                                    train_aggregate_targets=train_aggregate_targets,
-                                    individuals_mean=individuals_mean,
-                                    individuals_kernel=individuals_kernel,
-                                    bag_kernel=bag_kernel,
-                                    bags_sizes=bags_sizes,
-                                    lbda=lbda)
+        # Initialize CME model modules
+        self.individuals_mean = individuals_mean
+        self.individuals_kernel = individuals_kernel
+        self.bag_kernel = bag_kernel
+        self.lbda = lbda
 
-    def _set_variational_strategy(self, landmark_points):
+    def _set_variational_strategy(self, inducing_points):
         """Sets variational family of distribution to use and variational approximation
             strategy module
 
         Args:
-            landmark_points (torch.Tensor): tensor of landmark points from which to
-                compute inducing points
+            inducing_points (torch.Tensor): tensor of landmark points from which to
+                compute inducing values
         Returns:
             type: gpytorch.variational.VariationalStrategy
 
         """
         # Use gaussian variational family
-        variational_distribution = CholeskyVariationalDistribution(num_inducing_points=landmark_points.size(0))
+        variational_distribution = variational.CholeskyVariationalDistribution(num_inducing_points=inducing_points.size(0))
 
         # Set default variational approximation strategy
         variational_strategy = VariationalStrategy(model=self,
-                                                   inducing_points=landmark_points,
+                                                   inducing_points=inducing_points,
                                                    variational_distribution=variational_distribution,
-                                                   learn_inducing_locations=True)
+                                                   learn_inducing_locations=False)
         return variational_strategy
 
     def forward(self, inputs):
@@ -71,18 +71,59 @@ class VariationalCMEProcess(ApproximateGP, CMEProcess):
                                                               covariance_matrix=covar)
         return prior_distribution
 
-    def get_elbo_computation_parameters(self):
+    def get_elbo_computation_parameters(self, bags_values, extended_bags_values):
         """Computes tensors required to derive expected logprob term in elbo loss
 
-        TODO : covariance matrix of individuals computed twice for individuals_to_cme_covar
-        and root_inv_individuals_covar, could probably flesh it out to compute it
-        once only if necessary, for now this is cleaner and poses no computational issue
+        Args:
+            bags_values (torch.Tensor): (n, r) tensor of bags values
+            extended_bags_values (torch.Tensor): (N, r) tensor of individuals bags values
 
         Returns:
-            type: gpytorch.lazy.LazyTensor, gpytorch.lazy.LazyTensor, gpytorch.lazy.LazyTensor
+            type: gpytorch.lazy.LazyTensor, gpytorch.lazy.LazyTensor
 
         """
-        cme_aggregate_covar = self.covar_module(self.train_bags)
-        individuals_to_cme_covar = self.get_individuals_to_cme_covar(self.train_individuals)
-        root_inv_individuals_covar = self.individuals_kernel(self.train_individuals).root_inv_decomposition().root
-        return cme_aggregate_covar, individuals_to_cme_covar, root_inv_individuals_covar
+        # Compute (L + λNI)^{-1/2} with L = l(extended_bags, extended_bags)
+        N = len(extended_bags_values)
+        extended_bags_covar = self.bag_kernel(extended_bags_values).add_diag(self.lbda * N * torch.ones(N))
+        root_inv_extended_bags_covar = extended_bags_covar.root_inv_decomposition().root
+
+        # Compute l(bags, extended_bags)
+        bags_to_extended_bags_covar = self.bag_kernel(bags_values, extended_bags_values)
+        return root_inv_extended_bags_covar, bags_to_extended_bags_covar
+
+
+class GridVariationalCMEProcess(VariationalCMEProcess):
+
+    def __init__(self, grid_size, grid_bounds, individuals_mean, individuals_kernel,
+                 bag_kernel, lbda):
+        # Initialize variational strategy
+        variational_strategy = self._set_variational_strategy(grid_size, grid_bounds)
+        super(VariationalCMEProcess, self).__init__(variational_strategy=variational_strategy)
+
+        # Initialize CME model modules
+        self.individuals_mean = individuals_mean
+        self.individuals_kernel = individuals_kernel
+        self.bag_kernel = bag_kernel
+        self.lbda = lbda
+
+    def _set_variational_strategy(self, grid_size, grid_bounds):
+        """Sets variational family of distribution to use and variational approximation
+            strategy module
+
+        Args:
+            grid_size (int): Size of the grid
+            grid_bounds (list[tuple[float]]): Bounds of each dimension of the grid
+                (should be a list of (float, float) tuples)
+        Returns:
+            type: gpytorch.variational.VariationalStrategy
+
+        """
+        # Use gaussian variational family
+        variational_distribution = variational.CholeskyVariationalDistribution(num_inducing_points=grid_size)
+
+        # Set grid variational approximation strategy
+        variational_strategy = variational.GridInterpolationVariationalStrategy(model=self,
+                                                                                grid_size=grid_size,
+                                                                                grid_bounds=grid_bounds,
+                                                                                variational_distribution=variational_distribution)
+        return variational_strategy
