@@ -74,3 +74,48 @@ def make_swiss_roll(n_samples, groundtruth=False, standardize=False, seed=None):
         X = (X - X.mean(dim=0)) / X.std(dim=0)
         t = (t - t.mean()) / t.std()
     return X, t
+
+
+def aggregate_bags(X, bags_sizes):
+    """Splits 3D coordinate tensor into subtensors for each bag and takes
+        mean value of their coordinate as bag value
+
+    Args:
+        X (torch.Tensor): (n_samples, 3) tensor
+        bags_sizes (list[int]): sizes of bags s.t. Σbag_sizes = n_samples
+
+    Returns:
+        type: torch.Tensor, list[tuple[float]]
+
+    """
+    assert sum(bags_sizes) == X.size(0), "Mismatch between roll samples size and bags size"
+
+    # Compute bag values by taking mean coordinate of each bag
+    X_by_bag = X.split(bags_sizes)
+    bags_values = torch.stack([x.mean(dim=0) for x in X_by_bag])
+
+    # Compute minimum and maximum height of each bag
+    bags_heights = [[x[:, -1].min().item(), x[:, -1].max().item()] for x in X_by_bag]
+    return bags_values, bags_heights
+
+
+def aggregate_targets(X, t, bags_heights):
+    """Splits targets by bags height chunks and averages them
+
+    Args:
+        X (torch.Tensor): (n_samples, 3) tensor
+        t (torch.Tensor): (n_samples,)
+        bags_heights (list[tuple[float]]): [(zmin, zmax)] of each bag
+
+    Returns:
+        type: Description of returned object.
+
+    """
+    # Adjust lowest/highest heights to match samples in case different tensor
+    bags_heights[0][0] = X[:, -1].min().item()
+    bags_heights[-1][1] = X[:, -1].max().item()
+
+    # Compute aggregate target values by averaging over height chunks
+    bags_masks = [(X[:, -1] >= zmin) & (X[:, -1] < zmax) for (zmin, zmax) in bags_heights]
+    aggregate_t = torch.stack([t[mask].mean() for mask in bags_masks])
+    return aggregate_t
