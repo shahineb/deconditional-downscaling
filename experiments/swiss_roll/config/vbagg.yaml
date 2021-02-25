@@ -1,0 +1,52 @@
+################################################################################
+#   CONFIGURATIONS FOR SWISS ROLL EXPERIMENT WITH VBAGG
+################################################################################
+
+
+# MODEL SPECIFICATIONS
+model:
+  # Name of model to use
+  name: 'vbagg'
+
+  # CME regularization parameter
+  lbda: 0.001
+
+  # Number of inducing points
+  n_inducing_points: 200
+
+  # Random seed for inducing points selection
+  seed: 42
+
+
+# DATASET
+dataset:
+  # Number of bags
+  nbags: 50
+
+  # Mean size of sampled bags
+  mean_bag_size: 100
+
+  # Size standard deviation of sampled bags
+  std_bag_size: 50
+
+  # Number of samples to use in groundtruth manifold
+  n_samples_groundtruth: 10000
+
+  # Random seed for dataset generation
+  seed: 42
+
+
+
+# TRAINING
+training:
+  # Name of model to use
+  name: 'vbagg'
+
+  # Learning rate
+  lr: 0.01
+
+  # Number of iterations
+  n_epochs: 100
+
+  # Weight of KL term in ELBO
+  beta: 1

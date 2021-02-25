@@ -1,21 +1,20 @@
 import torch
 import gpytorch
 from progress.bar import Bar
-from models import VariationalCMEProcess, CMEProcessLikelihood, MODELS, TRAINERS, PREDICTERS
+from models import VariationalGP, VBaggGaussianLikelihood, MODELS, TRAINERS, PREDICTERS
 
 
-@MODELS.register('variational_cme_process')
-def build_swiss_roll_variational_cme_process(individuals, lbda, n_inducing_points, seed, **kwargs):
-    """Hard-coded initialization of Exact CME Process module used for swiss roll experiment
+@MODELS.register('vbagg')
+def build_swiss_roll_vbagg_model(individuals, n_inducing_points, seed, **kwargs):
+    """Hard-coded initialization of Vbagg model used for swiss roll experiment
 
     Args:
-        inducing_points (torch.Tensor)
-        lbda (float)
+        individuals (torch.Tensor)
         n_inducing_points (int)
         seed (int)
 
     Returns:
-        type: ExactCMEProcess
+        type: VariationalGP
 
     """
     # Inverse softplus utility for gpytorch lengthscale intialization
@@ -29,11 +28,6 @@ def build_swiss_roll_variational_cme_process(individuals, lbda, n_inducing_point
     base_individuals_kernel.initialize(raw_lengthscale=inv_softplus(x=1, n=3))
     individuals_kernel = gpytorch.kernels.ScaleKernel(base_individuals_kernel)
 
-    # Define bags kernels
-    base_bag_kernel = gpytorch.kernels.RBFKernel(ard_num_dims=3)
-    base_bag_kernel.initialize(raw_lengthscale=inv_softplus(x=1, n=3))
-    bag_kernel = gpytorch.kernels.ScaleKernel(base_bag_kernel)
-
     # Select inducing points
     if seed:
         torch.random.manual_seed(seed)
@@ -41,17 +35,15 @@ def build_swiss_roll_variational_cme_process(individuals, lbda, n_inducing_point
     inducing_points = individuals[rdm_idx]
 
     # Define model
-    model = VariationalCMEProcess(individuals_mean=individuals_mean,
-                                  individuals_kernel=individuals_kernel,
-                                  bag_kernel=bag_kernel,
-                                  inducing_points=inducing_points,
-                                  lbda=lbda)
+    model = VariationalGP(inducing_points=inducing_points,
+                          mean_module=individuals_mean,
+                          covar_module=individuals_kernel)
     return model
 
 
-@TRAINERS.register('variational_cme_process')
-def train_swiss_roll_variational_cme_process(model, individuals, bags_values, aggregate_targets, bags_sizes, lr, n_epochs, beta, **kwargs):
-    """Hard-coded training script of Exact CME Process for swiss roll experiment
+@TRAINERS.register('vbagg')
+def train_swiss_roll_vbagg_model(model, individuals, aggregate_targets, bags_sizes, lr, n_epochs, beta, **kwargs):
+    """Hard-coded training script of Vbagg model for swiss roll experiment
 
     Args:
         model (VariationalGP)
@@ -63,8 +55,8 @@ def train_swiss_roll_variational_cme_process(model, individuals, bags_values, ag
         beta (float)
 
     """
-    # Define variational CME process likelihood
-    likelihood = CMEProcessLikelihood()
+    # Define VBAGG likelihood
+    likelihood = VBaggGaussianLikelihood()
 
     # Set model in training mode
     model.train()
@@ -75,9 +67,6 @@ def train_swiss_roll_variational_cme_process(model, individuals, bags_values, ag
     optimizer = torch.optim.Adam(params=parameters, lr=lr)
     elbo = gpytorch.mlls.VariationalELBO(likelihood, model, num_data=len(aggregate_targets), beta=beta)
 
-    # Extend bags tensor to match individuals size
-    extended_bags_values = torch.cat([x.unsqueeze(0).repeat(bag_size, 1) for (x, bag_size) in zip(bags_values, bags_sizes)])
-
     bar = Bar("Epoch", max=n_epochs)
     for _ in range(n_epochs):
         # Zero-out remaining gradients
@@ -86,15 +75,10 @@ def train_swiss_roll_variational_cme_process(model, individuals, bags_values, ag
         # Compute q(f)
         q = model(individuals)
 
-        # Compute tensors needed for ELBO computation
-        root_inv_extended_bags_covar, bags_to_extended_bags_covar = model.get_elbo_computation_parameters(bags_values=bags_values,
-                                                                                                          extended_bags_values=extended_bags_values)
-
         # Compute negative ELBO loss
         loss = -elbo(variational_dist_f=q,
                      target=aggregate_targets,
-                     root_inv_extended_bags_covar=root_inv_extended_bags_covar,
-                     bags_to_extended_bags_covar=bags_to_extended_bags_covar)
+                     bags_sizes=bags_sizes)
 
         # Take gradient step
         loss.backward()
@@ -104,13 +88,13 @@ def train_swiss_roll_variational_cme_process(model, individuals, bags_values, ag
         bar.next()
 
 
-@PREDICTERS.register('variational_cme_process')
-def predict_swiss_roll_variational_cme_process(model, individuals, **kwargs):
-    """Hard-coded prediciton of individuals posterior for Exact CME Process on
+@PREDICTERS.register('vbagg')
+def predict_swiss_roll_vbagg_model(model, individuals, **kwargs):
+    """Hard-coded prediciton of individuals posterior for vbagg model on
     swiss roll experiment
 
     Args:
-        model (ExactCMEProcess)
+        model (VariationalGP)
         individuals (torch.Tensor)
 
     Returns:

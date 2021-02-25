@@ -51,13 +51,13 @@ class VariationalGP(ApproximateGP):
 
         """
         # Compute mean vector and covariance matrix on input samples
-        mean_x = self.mean_module(inputs)
-        covar_x = self.covar_module(inputs)
+        mean = self.mean_module(inputs)
+        covar = self.covar_module(inputs)
 
         # Build multivariate normal distribution of model evaluated on input samples
-        samples_prior_distribution = distributions.MultivariateNormal(mean=mean_x,
-                                                                      covariance_matrix=covar_x)
-        return samples_prior_distribution
+        prior_distribution = distributions.MultivariateNormal(mean=mean,
+                                                              covariance_matrix=covar)
+        return prior_distribution
 
     def __call__(self, inputs, prior=False, **kwargs):
         """Parent class method rewritten here just of the sake of clarity

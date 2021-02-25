@@ -1,5 +1,5 @@
-from src.models import ExactCMEProcess, VariationalCMEProcess
-from src.likelihoods import CMEProcessLikelihood
+from src.models import ExactCMEProcess, VariationalCMEProcess, VariationalGP
+from src.likelihoods import CMEProcessLikelihood, VBaggGaussianLikelihood
 from src.utils import Registry
 """
 Registry of experiment models
@@ -25,3 +25,5 @@ def predict(cfg):
 
 from .exact_cme_process import *
 from .variational_cme_process import *
+from .linear_interpolation import *
+from .vbagg import *

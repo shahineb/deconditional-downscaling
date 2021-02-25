@@ -1,0 +1,33 @@
+################################################################################
+#   CONFIGURATIONS FOR SWISS ROLL EXPERIMENT WITH LINEAR INTERPOLATION
+################################################################################
+
+
+# MODEL SPECIFICATIONS
+model:
+  # Name of model to use
+  name: 'linear_interpolation'
+
+
+# DATASET
+dataset:
+  # Number of bags
+  nbags: 50
+
+  # Mean size of sampled bags
+  mean_bag_size: 100
+
+  # Size standard deviation of sampled bags
+  std_bag_size: 50
+
+  # Number of samples to use in groundtruth manifold
+  n_samples_groundtruth: 10000
+
+  # Random seed for dataset generation
+  seed: 42
+
+
+# TRAINING
+training:
+  # Name of model to use
+  name: 'linear_interpolation'
