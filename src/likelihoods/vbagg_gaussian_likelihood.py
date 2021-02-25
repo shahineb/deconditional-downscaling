@@ -4,7 +4,7 @@ from gpytorch.likelihoods import GaussianLikelihood
 from gpytorch import distributions
 
 
-class GaussianBagLikelihood(GaussianLikelihood):
+class VBaggGaussianLikelihood(GaussianLikelihood):
     """Gaussian likelihood modelling aggregated bag observation y_a against bag
     individuals B_a under individuals regression model f
 

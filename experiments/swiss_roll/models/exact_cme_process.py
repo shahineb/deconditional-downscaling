@@ -5,7 +5,7 @@ from models import ExactCMEProcess, MODELS, TRAINERS, PREDICTERS
 
 
 @MODELS.register('exact_cme_process')
-def build_swiss_roll_exact_cme_process(individuals, bags_values, aggregate_targets, bags_sizes, lbda=1e-2, **kwargs):
+def build_swiss_roll_exact_cme_process(individuals, bags_values, aggregate_targets, bags_sizes, lbda, **kwargs):
     """Hard-coded initialization of Exact CME Process module used for swiss roll experiment
 
     Args:
@@ -49,7 +49,7 @@ def build_swiss_roll_exact_cme_process(individuals, bags_values, aggregate_targe
 
 
 @TRAINERS.register('exact_cme_process')
-def train_swiss_roll_exact_cme_process(model, lr=0.1, n_epochs=30, **kwargs):
+def train_swiss_roll_exact_cme_process(model, lr, n_epochs, **kwargs):
     """Hard-coded training script of Exact CME Process for swiss roll experiment
 
     Args:
@@ -63,19 +63,28 @@ def train_swiss_roll_exact_cme_process(model, lr=0.1, n_epochs=30, **kwargs):
     model.likelihood.train()
 
     # Define optimizer and exact loglikelihood module
-    optimizer = torch.optim.Adam(params=model.parameters(), lr=0.1)
+    optimizer = torch.optim.Adam(params=model.parameters(), lr=lr)
     mll = gpytorch.mlls.ExactMarginalLogLikelihood(model.likelihood, model)
 
-    # Iterate over epochs
     bar = Bar("Epoch", max=n_epochs)
     for _ in range(n_epochs):
+        # Zero-out remaining gradients
         optimizer.zero_grad()
+
+        # Compute marginal distribution p(.|x,y)
         output = model(model.train_bags)
+
+        # Evaluate -logp(z|x, y) on aggregate observations z
         loss = -mll(output, model.train_aggregate_targets)
+
+        # Take gradient step
         loss.backward()
         optimizer.step()
+
+        # Update aggregation operators based on new hyperparameters
         with torch.no_grad():
             model.update_cme_estimate_parameters()
+
         bar.suffix = f"NLL {loss.item()}"
         bar.next()
 
