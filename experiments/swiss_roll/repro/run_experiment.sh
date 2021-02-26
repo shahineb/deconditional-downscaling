@@ -11,7 +11,7 @@ VBAGG_OUTDIR=experiments/swiss_roll/data/experiment_outputs/vbagg
 LINEAR_INTERPOLATION_OUTDIR=experiments/swiss_roll/data/experiment_outputs/linear_interpolation
 
 # Run experiments for multiple seeds
-for SEED in 5 13 42 73 101 ;
+for SEED in 3 5 7 13 15 19 23 31 37 41 42 59 61 67 71 73 79 83 97 101 ;
 do
   DIRNAME=seed_$SEED
   python experiments/swiss_roll/run_experiment.py --plot --seed=$SEED --cfg=$EXACT_CME_CFG --o=$EXACT_CME_OUTDIR/$DIRNAME
