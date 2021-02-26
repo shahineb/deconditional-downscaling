@@ -7,24 +7,21 @@ Code for [[to be inserted]] by Siu Chau, Shahine Bouabid and Dino Sejdinovic
 
 _Fill with brief description and command to run for immediate try out of repo_
 
-- Run Swiss Roll experiment with Exact CME
-```python
-$ python experiments/swiss_roll/run_experiment.py --cfg=experiments/swiss_roll/config/exact_cme_process.yaml --o=output/dir
+- Run Swiss Roll Experiment
+
+Pick one of the configuration files listed under
+```
+experiments/swiss_roll/config/
+├── exact_cme_process.yaml
+├── linear_interpolation.yaml
+├── variational_cme_process.yaml
+└── vbagg.yaml
 ```
 
-- Run Swiss Roll experiment with Variational CME
-```python
-$ python experiments/swiss_roll/run_experiment.py --cfg=experiments/swiss_roll/config/variational_cme_process.yaml --o=output/dir
-```
+and run from root directory
 
-- Run Swiss Roll experiment with Vbagg
-```python
-$ python experiments/swiss_roll/run_experiment.py --cfg=experiments/swiss_roll/config/vbagg.yaml --o=output/dir
-```
-
-- Run Swiss Roll experiment with Linear Interpolation
-```python
-$ python experiments/swiss_roll/run_experiment.py --cfg=experiments/swiss_roll/config/linear_interpolation.yaml --o=output/dir
+```bash
+$ python experiments/swiss_roll/run_experiment.py --cfg=path/to/config/file --o=path/output/directory
 ```
 
 
