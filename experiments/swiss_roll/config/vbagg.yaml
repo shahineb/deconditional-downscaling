@@ -46,7 +46,17 @@ training:
   lr: 0.01
 
   # Number of iterations
-  n_epochs: 100
+  n_epochs: 80
 
   # Weight of KL term in ELBO
-  beta: 1
+  beta: 0.001
+
+
+
+# EVALUATION
+evaluation:
+  # Number of samples to use for NLL computation - doesn't scale
+  n_samples_nll: 2000
+
+  # Random seed for samples selection
+  seed: 42

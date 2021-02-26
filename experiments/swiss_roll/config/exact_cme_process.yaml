@@ -40,3 +40,12 @@ training:
 
   # Number of iterations
   n_epochs: 30
+
+
+# EVALUATION
+evaluation:
+  # Number of samples to use for NLL computation - doesn't scale
+  n_samples_nll: 2000
+
+  # Random seed for samples selection
+  seed: 42

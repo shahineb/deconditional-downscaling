@@ -3,7 +3,7 @@ import sys
 import numpy as np
 import torch
 
-base_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "../..")
+base_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "../../..")
 sys.path.append(base_dir)
 
 from src.utils import setseed

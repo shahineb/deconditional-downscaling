@@ -31,3 +31,12 @@ dataset:
 training:
   # Name of model to use
   name: 'linear_interpolation'
+
+
+# EVALUATION
+evaluation:
+  # Number of samples to use for NLL computation - doesn't scale
+  n_samples_nll: 2000
+
+  # Random seed for samples selection
+  seed: 42
