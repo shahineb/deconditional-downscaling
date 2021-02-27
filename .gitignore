@@ -35,3 +35,6 @@ __pycache__/
 
 # Sandbox directories
 **/sandbox
+
+# Experiment outputs
+**/experiment_outputs
