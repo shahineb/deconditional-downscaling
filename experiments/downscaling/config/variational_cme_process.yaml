@@ -1,0 +1,71 @@
+################################################################################
+#   CONFIGURATIONS FOR STATISTICAL DOWNSCALING EXPERIMENT WITH VARIATIONAL CME PROCESS
+################################################################################
+
+
+# MODEL SPECIFICATIONS
+model:
+  # Name of model to use
+  name: 'variational_cme_process'
+
+  # CME regularization parameter
+  lbda: 0.001
+
+  # Number of inducing points
+  n_inducing_points: 1000
+
+  # Random seed for inducing points selection
+  seed: 42
+
+
+# DATASET
+dataset:
+  # Path to fields to load
+  path: 'experiments/downscaling/data/orog_clt_albisccp_pctisccp_ttop_lat360_lon720_195003.nc'
+
+  # Names of fields used as covariates
+  covariate_fields_names:
+    - 'orog'        # Surface Altitude
+    - 'albisccp'    # Cloud Albedo
+    - 'clt'         # Total Cloud Coverage
+    - 'pctisccp'    # Mean Cloud Top Pressure
+
+  # Name of field to use as target
+  target_field_name: 'ttop'   # Cloud Top Temperature
+
+  # Downsampling block size
+  block_size:
+    - 3             # height
+    - 3             # width
+
+  # Random seed for dataset generation
+  seed: 42
+
+
+
+# TRAINING
+training:
+  # Name of model to use
+  name: 'variational_cme_process'
+
+  # Learning rate
+  lr: 0.001
+
+  # Number of iterations
+  n_epochs: 60
+
+  # Batch size
+  batch_size: 256
+
+  # Weight of KL term in ELBO
+  beta: 0.001
+
+  # Random seed used to choose shuffle dataset
+  seed: 42
+
+
+
+# EVALUATION
+evaluation:
+  # Step size used to extract grid blocks for inference - to be removed once RFF inference implemented
+  step_size: 10
