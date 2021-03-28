@@ -68,7 +68,7 @@ def make_tensor_dataset(covariates_fields, aggregate_target_field, block_size):
                                                                                         bags_grid=bags_grid,
                                                                                         target_grid=target_grid,
                                                                                         block_size=block_size)
-    return covariates_grid, covariates_blocks, bags_blocks, extended_bags, targets_blocks
+    return covariates_grid.float(), covariates_blocks.float(), bags_blocks.float(), extended_bags.float(), targets_blocks.float()
 
 
 def load_field(file_path, date=None):

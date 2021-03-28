@@ -1,10 +1,12 @@
 import os
+import yaml
 import torch
 import gpytorch
 import matplotlib.pyplot as plt
 from progress.bar import Bar
 from models import VariationalCMEProcess, CMEProcessLikelihood, MODELS, TRAINERS, PREDICTERS
 from core.visualization import plot_downscaling_prediction
+from core.metrics import compute_metrics
 
 
 @MODELS.register('variational_cme_process')
@@ -53,7 +55,7 @@ def build_downscaling_variational_cme_process(covariates_blocks, lbda, n_inducin
     if seed:
         torch.random.manual_seed(seed)
     rdm_idx = torch.randperm(len(covariates_blocks))[:n_inducing_points]
-    inducing_points = covariates_blocks[rdm_idx].mean(dim=1)
+    inducing_points = covariates_blocks[rdm_idx].mean(dim=1).float()
 
     # Define model
     model = VariationalCMEProcess(individuals_mean=individuals_mean,
@@ -112,12 +114,25 @@ def train_downscaling_variational_cme_process(model, covariates_blocks, bags_blo
     parameters = list(model.parameters()) + list(likelihood.parameters())
     optimizer = torch.optim.Adam(params=parameters, lr=lr)
     elbo = gpytorch.mlls.VariationalELBO(likelihood, model, num_data=len(targets_blocks), beta=beta)
-
-    # Training loop
     if seed:
         torch.random.manual_seed(seed)
 
+    # Transfer on device
+    device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
+    model = model.to(device)
+    likelihood = likelihood.to(device)
+    covariates_grid = covariates_grid.to(device)
+    covariates_blocks = covariates_blocks.to(device)
+    bags_blocks = bags_blocks.to(device)
+    extended_y = extended_bags.to(device)
+    targets_blocks = targets_blocks.to(device)
+
+    # Initialize progress bar
     epoch_bar = Bar("Epoch", max=n_epochs)
+    epoch_bar.finish()
+
+    # Metrics record
+    metrics = dict()
 
     for epoch in range(n_epochs):
 
@@ -147,16 +162,23 @@ def train_downscaling_variational_cme_process(model, covariates_blocks, bags_blo
             batch_bar.suffix = f"ELBO {-loss.item()}"
             batch_bar.next()
 
+        # Compute posterior distribution at current epoch and store metrics
+        individuals_posterior = predict_downscaling_variational_cme_process(model=model,
+                                                                            covariates_grid=covariates_grid,
+                                                                            step_size=step_size,
+                                                                            target_field=target_field)
+        epoch_metrics = compute_metrics(individuals_posterior, groundtruth_field)
+        metrics[epoch + 1] = epoch_metrics
+        with open(os.path.join(dump_dir, 'running_metrics.yaml'), 'w') as f:
+            yaml.dump({'epoch': metrics}, f)
+
+        # Dump plot of posterior prediction at current epoch
         if plot:
-            # Dump plot of posterior prediction at current epoch
-            individuals_posterior = predict_downscaling_variational_cme_process(model=model,
-                                                                                covariates_grid=covariates_grid,
-                                                                                step_size=step_size,
-                                                                                target_field=target_field)
             _ = plot_downscaling_prediction(individuals_posterior, groundtruth_field, target_field)
             plt.savefig(os.path.join(dump_dir, f'png/epoch_{epoch}.png'))
             plt.close()
         epoch_bar.next()
+        epoch_bar.finish()
 
 
 @PREDICTERS.register('variational_cme_process')
@@ -197,7 +219,8 @@ def predict_downscaling_variational_cme_process(model, covariates_grid, step_siz
 
     # Encapsulate as MultivariateNormal
     mean_posterior = torch.cat(row_wise_pred, dim=0).flatten() * target_field.values.std() + target_field.values.mean()
-    dummy_covariance = gpytorch.lazy.DiagLazyTensor(diag=torch.ones(len(mean_posterior)))
+    mean_posterior = mean_posterior.cpu()
+    dummy_covariance = gpytorch.lazy.DiagLazyTensor(diag=torch.ones_like(mean_posterior))
     individuals_posterior = gpytorch.distributions.MultivariateNormal(mean=mean_posterior,
                                                                       covariance_matrix=dummy_covariance)
 
