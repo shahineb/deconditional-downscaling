@@ -91,6 +91,14 @@ def train_downscaling_variational_cme_process(model, covariates_blocks, bags_blo
         plot (bool)
 
     """
+    # Transfer on device
+    device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
+    covariates_grid = covariates_grid.to(device)
+    covariates_blocks = covariates_blocks.to(device)
+    bags_blocks = bags_blocks.to(device)
+    extended_y = extended_bags.to(device)
+    targets_blocks = targets_blocks.to(device)
+
     # Define stochastic batch iterator
     def batch_iterator(batch_size):
         rdm_indices = torch.randperm(len(targets_blocks))
@@ -109,6 +117,8 @@ def train_downscaling_variational_cme_process(model, covariates_blocks, bags_blo
     # Set model in training mode
     model.train()
     likelihood.train()
+    model = model.to(device)
+    likelihood = likelihood.to(device)
 
     # Define optimizer and elbo module
     parameters = list(model.parameters()) + list(likelihood.parameters())
@@ -116,16 +126,6 @@ def train_downscaling_variational_cme_process(model, covariates_blocks, bags_blo
     elbo = gpytorch.mlls.VariationalELBO(likelihood, model, num_data=len(targets_blocks), beta=beta)
     if seed:
         torch.random.manual_seed(seed)
-
-    # Transfer on device
-    device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
-    model = model.to(device)
-    likelihood = likelihood.to(device)
-    covariates_grid = covariates_grid.to(device)
-    covariates_blocks = covariates_blocks.to(device)
-    bags_blocks = bags_blocks.to(device)
-    extended_y = extended_bags.to(device)
-    targets_blocks = targets_blocks.to(device)
 
     # Initialize progress bar
     epoch_bar = Bar("Epoch", max=n_epochs)
