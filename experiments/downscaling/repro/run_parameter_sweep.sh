@@ -5,7 +5,7 @@ VARIATIONAL_CME_CFG=experiments/downscaling/config/variational_cme_process.yaml
 VARIATIONAL_CME_OUTDIR=experiments/downscaling/data/experiment_outputs/parameter_sweep/variational_cme_process
 
 # Define parameter grid to parse onto
-VALUES_BATCHSIZE=(8 32 128)
+VALUES_BATCHSIZE=(8 32 64)
 VALUES_BETA=(1 1e-3 1e-6)
 VALUES_LBDA=(1e-1 1e-3 1e-5)
 VALUES_LR=(1e-2 1e-3 1e-4)
