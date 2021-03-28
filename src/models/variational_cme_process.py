@@ -84,7 +84,7 @@ class VariationalCMEProcess(ApproximateGP, CMEProcess):
         """
         # Compute (L + λNI)^{-1/2} with L = l(extended_bags, extended_bags)
         N = len(extended_bags_values)
-        extended_bags_covar = self.bag_kernel(extended_bags_values).add_diag(self.lbda * N * torch.ones(N))
+        extended_bags_covar = self.bag_kernel(extended_bags_values).add_diag(self.lbda * N * torch.ones(N, device=extended_bags_values.device))
         root_inv_extended_bags_covar = extended_bags_covar.root_inv_decomposition().root
 
         # Compute l(bags, extended_bags)

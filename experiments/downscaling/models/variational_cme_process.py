@@ -96,12 +96,12 @@ def train_downscaling_variational_cme_process(model, covariates_blocks, bags_blo
     covariates_grid = covariates_grid.to(device)
     covariates_blocks = covariates_blocks.to(device)
     bags_blocks = bags_blocks.to(device)
-    extended_y = extended_bags.to(device)
+    extended_bags = extended_bags.to(device)
     targets_blocks = targets_blocks.to(device)
 
     # Define stochastic batch iterator
     def batch_iterator(batch_size):
-        rdm_indices = torch.randperm(len(targets_blocks))
+        rdm_indices = torch.randperm(len(targets_blocks)).to(device)
         n_dim_individuals = covariates_blocks.size(-1)
         n_dim_bags = bags_blocks.size(-1)
         for idx in rdm_indices.split(batch_size):
@@ -199,6 +199,9 @@ def predict_downscaling_variational_cme_process(model, covariates_grid, step_siz
 
     """
     # Set model in evaluation mode
+    device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
+    covariates_grid = covariates_grid.to(device)
+    model = model.to(device)
     model.eval()
 
     # Compute predictive posterior on individuals
@@ -210,6 +213,9 @@ def predict_downscaling_variational_cme_process(model, covariates_grid, step_siz
             x_test = covariates_grid[i:i + step_size, j:j + step_size]
             block_size = x_test.shape[:-1]
             with torch.no_grad():
+                print("covariate grid : ", covariates_grid.device)
+                print("x_test : ", x_test.device)
+                print("model : ", model.variational_strategy.inducing_points.device)
                 individuals_posterior = model(x_test.reshape(-1, covariates_grid.size(-1)))
             output = individuals_posterior.mean.reshape(*block_size)
             col_wise_pred.append(output)
