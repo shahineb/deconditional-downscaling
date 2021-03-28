@@ -213,9 +213,6 @@ def predict_downscaling_variational_cme_process(model, covariates_grid, step_siz
             x_test = covariates_grid[i:i + step_size, j:j + step_size]
             block_size = x_test.shape[:-1]
             with torch.no_grad():
-                print("covariate grid : ", covariates_grid.device)
-                print("x_test : ", x_test.device)
-                print("model : ", model.variational_strategy.inducing_points.device)
                 individuals_posterior = model(x_test.reshape(-1, covariates_grid.size(-1)))
             output = individuals_posterior.mean.reshape(*block_size)
             col_wise_pred.append(output)
