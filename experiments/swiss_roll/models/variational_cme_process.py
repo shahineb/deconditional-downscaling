@@ -6,16 +6,16 @@ from models import VariationalCMEProcess, CMEProcessLikelihood, MODELS, TRAINERS
 
 @MODELS.register('variational_cme_process')
 def build_swiss_roll_variational_cme_process(individuals, lbda, n_inducing_points, seed, **kwargs):
-    """Hard-coded initialization of Exact CME Process module used for swiss roll experiment
+    """Hard-coded initialization of Variational CME Process module used for swiss roll experiment
 
     Args:
-        inducing_points (torch.Tensor)
+        individuals (torch.Tensor)
         lbda (float)
         n_inducing_points (int)
         seed (int)
 
     Returns:
-        type: ExactCMEProcess
+        type: VariationalCMEProcess
 
     """
     # Inverse softplus utility for gpytorch lengthscale intialization
@@ -51,7 +51,7 @@ def build_swiss_roll_variational_cme_process(individuals, lbda, n_inducing_point
 
 @TRAINERS.register('variational_cme_process')
 def train_swiss_roll_variational_cme_process(model, individuals, bags_values, aggregate_targets, bags_sizes, lr, n_epochs, beta, **kwargs):
-    """Hard-coded training script of Exact CME Process for swiss roll experiment
+    """Hard-coded training script of Variational CME Process for swiss roll experiment
 
     Args:
         model (VariationalGP)
@@ -106,11 +106,11 @@ def train_swiss_roll_variational_cme_process(model, individuals, bags_values, ag
 
 @PREDICTERS.register('variational_cme_process')
 def predict_swiss_roll_variational_cme_process(model, individuals, **kwargs):
-    """Hard-coded prediciton of individuals posterior for Exact CME Process on
+    """Hard-coded prediciton of individuals posterior for Variational CME Process on
     swiss roll experiment
 
     Args:
-        model (ExactCMEProcess)
+        model (VariationalCMEProcess)
         individuals (torch.Tensor)
 
     Returns:
