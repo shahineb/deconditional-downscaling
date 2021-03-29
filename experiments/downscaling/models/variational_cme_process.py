@@ -30,7 +30,7 @@ def build_downscaling_variational_cme_process(covariates_blocks, lbda, n_inducin
     individuals_mean = gpytorch.means.ZeroMean()
 
     # Define individuals kernel
-    base_indiv_spatial_kernel = gpytorch.kernels.MaternKernel(nu=1.5, ard_num_dims=3, active_dims=[0, 1, 2])
+    base_indiv_spatial_kernel = gpytorch.kernels.MaternKernel(nu=0.5, ard_num_dims=3, active_dims=[0, 1, 2])
     base_indiv_spatial_kernel.initialize(raw_lengthscale=inv_softplus(x=1, n=3))
 
     base_indiv_feat_kernel = gpytorch.kernels.MaternKernel(nu=0.5, ard_num_dims=3, active_dims=[3, 4, 5])
@@ -41,10 +41,10 @@ def build_downscaling_variational_cme_process(covariates_blocks, lbda, n_inducin
     individuals_kernel = individuals_spatial_kernel + individuals_feat_kernel
 
     # Define bags kernels
-    base_bag_spatial_kernel = gpytorch.kernels.MaternKernel(nu=1.5, ard_num_dims=3, active_dims=[0, 1, 2])
+    base_bag_spatial_kernel = gpytorch.kernels.MaternKernel(nu=0.5, ard_num_dims=3, active_dims=[0, 1, 2])
     base_bag_spatial_kernel.initialize(raw_lengthscale=inv_softplus(x=1, n=3))
 
-    base_bag_feat_kernel = gpytorch.kernels.MaternKernel(nu=1.5, ard_num_dims=3, active_dims=[3, 4, 5])
+    base_bag_feat_kernel = gpytorch.kernels.MaternKernel(nu=0.5, ard_num_dims=3, active_dims=[3, 4, 5])
     base_bag_feat_kernel.initialize(raw_lengthscale=inv_softplus(x=1, n=3))
 
     bag_spatial_kernel = gpytorch.kernels.ScaleKernel(base_bag_spatial_kernel)
