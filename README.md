@@ -1,4 +1,4 @@
-# Conditional Mean Embedding Process
+# Deconditioning with Gaussian Processes
 
 Code for [[to be inserted]] by Siu Chau, Shahine Bouabid and Dino Sejdinovic
 

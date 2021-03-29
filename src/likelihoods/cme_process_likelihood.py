@@ -27,7 +27,7 @@ class CMEProcessLikelihood(GaussianLikelihood):
 
         # Setup identity lazy tensor for efficient quad computations
         Id_n = lazy.DiagLazyTensor(diag=torch.ones_like(observations))
-        Id_N = lazy.DiagLazyTensor(diag=torch.ones_like(variational_mean))
+        Id_N = lazy.DiagLazyTensor(diag=torch.ones(variational_root_covar.size(-1), device=variational_mean.device))
 
         # Make bags to extended bags buffer matrix
         buffer = bags_to_extended_bags_covar @ root_inv_extended_bags_covar

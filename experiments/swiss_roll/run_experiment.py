@@ -5,7 +5,7 @@ Description : Runs swiss roll experiment
     (2) - Fits aggregate model hyperparameters on generated dataset
     (3) - Compute model prediction on indiviuals
 
-Usage: run_experiment.py  [options] --cfg=<path_to_config> --o=<output_dir> [--nbags=<nbags>] [--mean_bag_size=<mean_bag_size>] [--std_bag_size=<std_bag_size>] [--seed=<seed>]
+Usage: run_experiment.py  [options] --cfg=<path_to_config> --o=<output_dir>
 
 Options:
   --cfg=<path_to_config>           Path to YAML configuration file to use.
@@ -13,6 +13,9 @@ Options:
   --mean_bag_size=<mean_bag_size>  Mean size of sampled bags.
   --std_bag_size=<std_bag_size>    Size standard deviation of sampled bags.
   --o=<output_dir>                 Output directory.
+  --lr=<lr>                        Learning rate.
+  --beta=<beta>                    Weight of KL term in ELBO for variational formulation.
+  --lbda=<lbda>                    CME inverse regularization term.
   --plot                           Outputs scatter plots.
   --seed=<seed>                    Random seed.
 """
@@ -186,6 +189,12 @@ def update_cfg(cfg, args):
         cfg['dataset']['std_bag_size'] = int(args['--std_bag_size'])
     if args['--seed']:
         cfg['dataset']['seed'] = int(args['--seed'])
+    if args['--lbda']:
+        cfg['model']['lbda'] = float(args['--lbda'])
+    if args['--lr']:
+        cfg['training']['lr'] = float(args['--lr'])
+    if args['--beta']:
+        cfg['training']['beta'] = float(args['--beta'])
     return cfg
 
 
@@ -205,6 +214,8 @@ if __name__ == "__main__":
 
     # Create output directory if doesn't exists
     os.makedirs(args['--o'], exist_ok=True)
+    with open(os.path.join(args['--o'], 'cfg.yaml'), 'w') as f:
+        yaml.dump(cfg, f)
 
     # Run session
     main(args, cfg)

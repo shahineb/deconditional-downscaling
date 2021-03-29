@@ -52,10 +52,10 @@ training:
   lr: 0.001
 
   # Number of iterations
-  n_epochs: 10
+  n_epochs: 60
 
   # Batch size
-  batch_size: 8
+  batch_size: 16
 
   # Weight of KL term in ELBO
   beta: 0.001
