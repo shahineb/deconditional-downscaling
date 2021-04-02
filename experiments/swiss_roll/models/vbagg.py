@@ -1,7 +1,10 @@
+import os
+import yaml
 import torch
 import gpytorch
 from progress.bar import Bar
 from models import VariationalGP, VBaggGaussianLikelihood, MODELS, TRAINERS, PREDICTERS
+from core.metrics import compute_metrics
 
 
 @MODELS.register('vbagg')
@@ -42,7 +45,8 @@ def build_swiss_roll_vbagg_model(individuals, n_inducing_points, seed, **kwargs)
 
 
 @TRAINERS.register('vbagg')
-def train_swiss_roll_vbagg_model(model, individuals, aggregate_targets, bags_sizes, lr, n_epochs, beta, **kwargs):
+def train_swiss_roll_vbagg_model(model, individuals, aggregate_targets, bags_sizes,
+                                 groundtruth_individuals, groundtruth_targets, lr, n_epochs, beta, dump_dir, **kwargs):
     """Hard-coded training script of Vbagg model for swiss roll experiment
 
     Args:
@@ -67,8 +71,13 @@ def train_swiss_roll_vbagg_model(model, individuals, aggregate_targets, bags_siz
     optimizer = torch.optim.Adam(params=parameters, lr=lr)
     elbo = gpytorch.mlls.VariationalELBO(likelihood, model, num_data=len(aggregate_targets), beta=beta)
 
+    # Initialize progress bar
     bar = Bar("Epoch", max=n_epochs)
-    for _ in range(n_epochs):
+
+    # Metrics record
+    metrics = dict()
+
+    for epoch in range(n_epochs):
         # Zero-out remaining gradients
         optimizer.zero_grad()
 
@@ -86,6 +95,14 @@ def train_swiss_roll_vbagg_model(model, individuals, aggregate_targets, bags_siz
 
         bar.suffix = f"ELBO {-loss.item()}"
         bar.next()
+
+        # Compute posterior distribution at current epoch and store metrics
+        individuals_posterior = predict_swiss_roll_vbagg_model(model=model,
+                                                               individuals=groundtruth_individuals)
+        epoch_metrics = compute_metrics(individuals_posterior, groundtruth_targets)
+        metrics[epoch + 1] = epoch_metrics
+        with open(os.path.join(dump_dir, 'running_metrics.yaml'), 'w') as f:
+            yaml.dump({'epoch': metrics}, f)
 
 
 @PREDICTERS.register('vbagg')
@@ -107,4 +124,7 @@ def predict_swiss_roll_vbagg_model(model, individuals, **kwargs):
     # Compute predictive posterior on individuals
     with torch.no_grad():
         individuals_posterior = model(individuals)
+
+    # Set back to trainind mode
+    model.train()
     return individuals_posterior

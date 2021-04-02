@@ -9,8 +9,8 @@ VARIATIONAL_CME_OUTDIR=experiments/swiss_roll/data/experiment_outputs/parameter_
 VBAGG_OUTDIR=experiments/swiss_roll/data/experiment_outputs/parameter_sweep/vbagg
 
 # Define parameter grid to parse onto
-VALUES_BETA=(1 1e-3 1e-6)
-VALUES_LBDA=(1e-1 1e-3 1e-5)
+VALUES_BETA=(1 1e-1 1e-2 1e-3 1e-4 1e-5 1e-6)
+VALUES_LBDA=(1 1e-1 1e-2 1e-3 1e-4 1e-5 1e-6)
 
 # Exact CME
 for lbda in ${VALUES_LBDA[@]}

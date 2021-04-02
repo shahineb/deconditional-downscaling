@@ -16,6 +16,7 @@ Options:
   --lr=<lr>                        Learning rate.
   --beta=<beta>                    Weight of KL term in ELBO for variational formulation.
   --lbda=<lbda>                    CME inverse regularization term.
+  --n_epochs=<n_epochs>            Number of training epochs
   --plot                           Outputs scatter plots.
   --seed=<seed>                    Random seed.
 """
@@ -60,7 +61,10 @@ def main(args, cfg):
                            individuals=individuals,
                            bags_values=bags_values,
                            aggregate_targets=aggregate_targets,
-                           bags_sizes=bags_sizes)
+                           bags_sizes=bags_sizes,
+                           groundtruth_individuals=X_gt,
+                           groundtruth_targets=t_gt,
+                           dump_dir=args['--o'])
     train_model(cfg['training'])
 
     # Compute individuals predictive posterior and plot prediction
@@ -195,6 +199,8 @@ def update_cfg(cfg, args):
         cfg['training']['lr'] = float(args['--lr'])
     if args['--beta']:
         cfg['training']['beta'] = float(args['--beta'])
+    if args['--n_epochs']:
+        cfg['training']['n_epochs'] = int(args['--n_epochs'])
     return cfg
 
 

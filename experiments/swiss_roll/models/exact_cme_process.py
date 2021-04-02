@@ -1,7 +1,10 @@
+import os
+import yaml
 import torch
 import gpytorch
 from progress.bar import Bar
 from models import ExactCMEProcess, MODELS, TRAINERS, PREDICTERS
+from core.metrics import compute_metrics
 
 
 @MODELS.register('exact_cme_process')
@@ -49,7 +52,8 @@ def build_swiss_roll_exact_cme_process(individuals, bags_values, aggregate_targe
 
 
 @TRAINERS.register('exact_cme_process')
-def train_swiss_roll_exact_cme_process(model, lr, n_epochs, **kwargs):
+def train_swiss_roll_exact_cme_process(model, lr, n_epochs, groundtruth_individuals,
+                                       groundtruth_targets, dump_dir, **kwargs):
     """Hard-coded training script of Exact CME Process for swiss roll experiment
 
     Args:
@@ -66,8 +70,13 @@ def train_swiss_roll_exact_cme_process(model, lr, n_epochs, **kwargs):
     optimizer = torch.optim.Adam(params=model.parameters(), lr=lr)
     mll = gpytorch.mlls.ExactMarginalLogLikelihood(model.likelihood, model)
 
+    # Initialize progress bar
     bar = Bar("Epoch", max=n_epochs)
-    for _ in range(n_epochs):
+
+    # Metrics record
+    metrics = dict()
+
+    for epoch in range(n_epochs):
         # Zero-out remaining gradients
         optimizer.zero_grad()
 
@@ -88,6 +97,14 @@ def train_swiss_roll_exact_cme_process(model, lr, n_epochs, **kwargs):
         bar.suffix = f"NLL {loss.item()}"
         bar.next()
 
+        # Compute posterior distribution at current epoch and store metrics
+        individuals_posterior = predict_swiss_roll_exact_cme_process(model=model,
+                                                                     individuals=groundtruth_individuals)
+        epoch_metrics = compute_metrics(individuals_posterior, groundtruth_targets)
+        metrics[epoch + 1] = epoch_metrics
+        with open(os.path.join(dump_dir, 'running_metrics.yaml'), 'w') as f:
+            yaml.dump({'epoch': metrics}, f)
+
 
 @PREDICTERS.register('exact_cme_process')
 def predict_swiss_roll_exact_cme_process(model, individuals, **kwargs):
@@ -104,9 +121,11 @@ def predict_swiss_roll_exact_cme_process(model, individuals, **kwargs):
     """
     # Set model in evaluation mode
     model.eval()
-    model.likelihood.eval()
 
     # Compute predictive posterior on individuals
     with torch.no_grad():
         individuals_posterior = model.predict(individuals)
+
+    # Set back to training mode
+    model.train()
     return individuals_posterior
