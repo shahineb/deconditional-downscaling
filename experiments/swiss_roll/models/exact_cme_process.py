@@ -1,10 +1,7 @@
-import os
-import yaml
 import torch
 import gpytorch
 from progress.bar import Bar
 from models import ExactCMEProcess, MODELS, TRAINERS, PREDICTERS
-from core.metrics import compute_metrics
 
 
 @MODELS.register('exact_cme_process')
@@ -62,6 +59,10 @@ def train_swiss_roll_exact_cme_process(model, lr, n_epochs, groundtruth_individu
         n_epochs (int)
 
     """
+    # Transfer on device
+    device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
+    model = model.to(device)
+
     # Set model in training mode
     model.train()
     model.likelihood.train()
@@ -109,6 +110,8 @@ def predict_swiss_roll_exact_cme_process(model, individuals, **kwargs):
 
     """
     # Set model in evaluation mode
+    model = model.cpu()
+    individuals = individuals.cpu()
     model.eval()
 
     # Compute predictive posterior on individuals

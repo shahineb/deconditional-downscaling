@@ -59,12 +59,21 @@ def train_swiss_roll_vbagg_model(model, individuals, aggregate_targets, bags_siz
         beta (float)
 
     """
+    # Transfer on device
+    device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
+    individuals = individuals.to(device)
+    aggregate_targets = aggregate_targets.to(device)
+    groundtruth_individuals = groundtruth_individuals.to(device)
+    groundtruth_targets = groundtruth_targets.to(device)
+
     # Define VBAGG likelihood
     likelihood = VBaggGaussianLikelihood()
 
     # Set model in training mode
     model.train()
     likelihood.train()
+    model = model.to(device)
+    likelihood = likelihood.to(device)
 
     # Define optimizer and elbo module
     parameters = list(model.parameters()) + list(likelihood.parameters())
@@ -119,6 +128,8 @@ def predict_swiss_roll_vbagg_model(model, individuals, **kwargs):
 
     """
     # Set model in evaluation mode
+    model = model.cpu()
+    individuals = individuals.cpu()
     model.eval()
 
     # Compute predictive posterior on individuals
