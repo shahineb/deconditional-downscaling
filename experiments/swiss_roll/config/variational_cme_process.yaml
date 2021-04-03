@@ -9,7 +9,7 @@ model:
   name: 'variational_cme_process'
 
   # CME regularization parameter
-  lbda: 0.001
+  lbda: 0.0001
 
   # Number of inducing points
   n_inducing_points: 200
@@ -43,10 +43,10 @@ training:
   name: 'variational_cme_process'
 
   # Learning rate
-  lr: 0.01
+  lr: 0.005
 
   # Number of iterations
-  n_epochs: 80
+  n_epochs: 150
 
   # Weight of KL term in ELBO
   beta: 0.001

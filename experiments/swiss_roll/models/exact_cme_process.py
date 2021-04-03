@@ -73,10 +73,7 @@ def train_swiss_roll_exact_cme_process(model, lr, n_epochs, groundtruth_individu
     # Initialize progress bar
     bar = Bar("Epoch", max=n_epochs)
 
-    # Metrics record
-    metrics = dict()
-
-    for epoch in range(n_epochs):
+    for _ in range(n_epochs):
         # Zero-out remaining gradients
         optimizer.zero_grad()
 
@@ -96,14 +93,6 @@ def train_swiss_roll_exact_cme_process(model, lr, n_epochs, groundtruth_individu
 
         bar.suffix = f"NLL {loss.item()}"
         bar.next()
-
-        # Compute posterior distribution at current epoch and store metrics
-        individuals_posterior = predict_swiss_roll_exact_cme_process(model=model,
-                                                                     individuals=groundtruth_individuals)
-        epoch_metrics = compute_metrics(individuals_posterior, groundtruth_targets)
-        metrics[epoch + 1] = epoch_metrics
-        with open(os.path.join(dump_dir, 'running_metrics.yaml'), 'w') as f:
-            yaml.dump({'epoch': metrics}, f)
 
 
 @PREDICTERS.register('exact_cme_process')

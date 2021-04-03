@@ -28,6 +28,7 @@ import torch
 import matplotlib.pyplot as plt
 import core.generation as gen
 import core.visualization as vis
+from core.metrics import compute_metrics
 from models import build_model, train_model, predict
 
 
@@ -149,7 +150,7 @@ def evaluate_model(cfg, model, individuals_posterior, X_gt, t_gt, output_dir):
     """Computes average NLL and MSE on individuals and dumps into YAML file
     """
     # Compute mean square error on individuals posterior
-    mse = torch.pow(individuals_posterior.mean - t_gt, 2).mean()
+    individuals_metrics = compute_metrics(individuals_posterior, t_gt)
 
     # Select subset of individuals for NLL computation - scalability
     torch.random.manual_seed(cfg['evaluation']['seed'])
@@ -167,7 +168,7 @@ def evaluate_model(cfg, model, individuals_posterior, X_gt, t_gt, output_dir):
         nll = -sub_individuals_posterior.log_prob(sub_individuals_target).div(n_individuals)
 
     # Record and dump as YAML file
-    individuals_metrics = {'mse': mse.item(), 'nll': nll.item()}
+    individuals_metrics.update(nll=nll.item())
     dump_path = os.path.join(output_dir, 'metrics.yaml')
     with open(dump_path, 'w') as f:
         yaml.dump(individuals_metrics, f)
