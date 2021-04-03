@@ -4,7 +4,7 @@
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=1
 #SBATCH --time=14-00:00:00
-#SBATCH --mem=2G
+#SBATCH --mem=3G
 #SBATCH --output=/data/ziz/not-backed-up/bouabid/tmp/slurm-%A_%a.o
 #SBATCH --error=/data/ziz/not-backed-up/bouabid/tmp/slurm-%A_%a.o
 
