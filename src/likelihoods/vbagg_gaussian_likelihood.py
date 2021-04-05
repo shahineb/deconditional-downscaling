@@ -89,7 +89,7 @@ class VBaggGaussianLikelihood(GaussianLikelihood):
         foo = 2 * observations * torch.stack([m.sum() for m in bags_evaluations_means])
         bar = torch.stack([S.add(m.ger(m)).sum() for (m, S) in zip(bags_evaluations_means,
                                                                    bags_evaluations_covars)])
-        bags_sizes = torch.Tensor(bags_sizes, device=observations.device)
+        bags_sizes = torch.Tensor(bags_sizes).to(observations.device)
         first_term = observations.pow(2) - foo.div(bags_sizes) + bar.div(bags_sizes.pow(2))
         first_term.mul_(bags_sizes / self.noise)
 

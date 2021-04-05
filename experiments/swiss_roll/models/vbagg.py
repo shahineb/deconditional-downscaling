@@ -64,7 +64,6 @@ def train_swiss_roll_vbagg_model(model, individuals, aggregate_targets, bags_siz
     individuals = individuals.to(device)
     aggregate_targets = aggregate_targets.to(device)
     groundtruth_individuals = groundtruth_individuals.to(device)
-    groundtruth_targets = groundtruth_targets.to(device)
 
     # Define VBAGG likelihood
     likelihood = VBaggGaussianLikelihood()

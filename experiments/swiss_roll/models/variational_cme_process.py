@@ -1,4 +1,5 @@
 import os
+import logging
 import yaml
 import torch
 import gpytorch
@@ -44,6 +45,7 @@ def build_swiss_roll_variational_cme_process(individuals, lbda, n_inducing_point
     inducing_points = individuals[rdm_idx]
 
     # Define model
+    logging.info("Does it even print?")
     model = VariationalCMEProcess(individuals_mean=individuals_mean,
                                   individuals_kernel=individuals_kernel,
                                   bag_kernel=bag_kernel,
@@ -68,12 +70,16 @@ def train_swiss_roll_variational_cme_process(model, individuals, bags_values, ag
 
     """
     # Transfer on device
+    logging.info("Where is the bottleneck ?")
     device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
+    logging.info(f"Individuals {individuals.shape} - Device {device}")
     individuals = individuals.to(device)
+    logging.info("Bags")
     bags_values = bags_values.to(device)
+    logging.info("Aggregate Targets")
     aggregate_targets = aggregate_targets.to(device)
+    logging.info("Groundtruth Individuals")
     groundtruth_individuals = groundtruth_individuals.to(device)
-    groundtruth_targets = groundtruth_targets.to(device)
 
     # Define variational CME process likelihood
     likelihood = CMEProcessLikelihood()
@@ -81,7 +87,9 @@ def train_swiss_roll_variational_cme_process(model, individuals, bags_values, ag
     # Set model in training mode
     model.train()
     likelihood.train()
+    print("Model")
     model = model.to(device)
+    print("Likelihood")
     likelihood = likelihood.to(device)
 
     # Define optimizer and elbo module
