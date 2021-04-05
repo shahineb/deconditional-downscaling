@@ -35,7 +35,8 @@ def build_swiss_roll_vbagg_model(individuals, n_inducing_points, seed, **kwargs)
     if seed:
         torch.random.manual_seed(seed)
     rdm_idx = torch.randperm(len(individuals))[:n_inducing_points]
-    inducing_points = individuals[rdm_idx]
+    device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
+    inducing_points = individuals[rdm_idx].to(device)
 
     # Define model
     model = VariationalGP(inducing_points=inducing_points,
