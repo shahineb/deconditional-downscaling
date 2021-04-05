@@ -9,7 +9,7 @@ model:
   name: 'variational_cme_process'
 
   # CME regularization parameter
-  lbda: 0.0001
+  lbda: 0.00007
 
   # Number of inducing points
   n_inducing_points: 200

@@ -48,7 +48,7 @@ class CMEProcess(ABC):
 
         # Compute precision matrix of bags values
         bags_covar = self.bag_kernel(extended_bags_values)
-        foo = bags_covar.add_diag(self.lbda * len(extended_bags_values) * torch.ones(len(extended_bags_values)), device=extended_bags_values.device)
+        foo = bags_covar.add_diag(self.lbda * len(extended_bags_values) * torch.ones(len(extended_bags_values), device=extended_bags_values.device))
         root_inv_bags_covar = foo.root_inv_decomposition().root
         return latent_individuals_mean, latent_individuals_covar, root_inv_bags_covar
 
