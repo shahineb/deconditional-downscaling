@@ -5,10 +5,10 @@ VBAGG_CFG=experiments/swiss_roll/config/vbagg.yaml
 LINEAR_INTERPOLATION_CFG=experiments/swiss_roll/config/linear_interpolation.yaml
 
 # Define output directories path variables
-EXACT_CME_OUTDIR=experiments/swiss_roll/data/experiment_outputs/exact_cme_process
-VARIATIONAL_CME_OUTDIR=experiments/swiss_roll/data/experiment_outputs/variational_cme_process
-VBAGG_OUTDIR=experiments/swiss_roll/data/experiment_outputs/vbagg
-LINEAR_INTERPOLATION_OUTDIR=experiments/swiss_roll/data/experiment_outputs/linear_interpolation
+EXACT_CME_OUTDIR=experiments/swiss_roll/data/experiment_outputs/seeds/exact_cme_process
+VARIATIONAL_CME_OUTDIR=experiments/swiss_roll/data/experiment_outputs/seeds/variational_cme_process
+VBAGG_OUTDIR=experiments/swiss_roll/data/experiment_outputs/seeds/vbagg
+LINEAR_INTERPOLATION_OUTDIR=experiments/swiss_roll/data/experiment_outputs/seeds/linear_interpolation
 
 # Run experiments for multiple seeds
 for SEED in 3 5 7 13 15 19 23 31 37 41 42 59 61 67 71 73 79 83 97 101 ;

@@ -36,13 +36,12 @@ def build_swiss_roll_exact_cme_process(individuals, bags_values, aggregate_targe
     bag_kernel = gpytorch.kernels.ScaleKernel(base_bag_kernel)
 
     # Define model
-    device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
     model = ExactCMEProcess(individuals_mean=individuals_mean,
                             individuals_kernel=individuals_kernel,
                             bag_kernel=bag_kernel,
-                            train_individuals=individuals.to(device),
-                            train_bags=bags_values.to(device),
-                            train_aggregate_targets=aggregate_targets.to(device),
+                            train_individuals=individuals,
+                            train_bags=bags_values,
+                            train_aggregate_targets=aggregate_targets,
                             bags_sizes=bags_sizes,
                             lbda=lbda,
                             likelihood=gpytorch.likelihoods.GaussianLikelihood())
@@ -60,10 +59,6 @@ def train_swiss_roll_exact_cme_process(model, lr, n_epochs, groundtruth_individu
         n_epochs (int)
 
     """
-    # Transfer on device
-    device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
-    model = model.to(device)
-
     # Set model in training mode
     model.train()
     model.likelihood.train()
@@ -111,8 +106,6 @@ def predict_swiss_roll_exact_cme_process(model, individuals, **kwargs):
 
     """
     # Set model in evaluation mode
-    model = model.cpu()
-    individuals = individuals.cpu()
     model.eval()
 
     # Compute predictive posterior on individuals
