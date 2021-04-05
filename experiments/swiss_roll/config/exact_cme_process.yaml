@@ -9,7 +9,7 @@ model:
   name: 'exact_cme_process'
 
   # CME regularization parameter
-  lbda: 0.008
+  lbda: 0.01
 
 
 # DATASET
