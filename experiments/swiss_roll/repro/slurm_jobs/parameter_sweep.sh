@@ -9,5 +9,5 @@
 #SBATCH --error=/data/ziz/not-backed-up/bouabid/tmp/slurm-%A_%a.o
 
 pyenv activate deconditioning
-bash /data/ziz/not-backed-up/bouabid/repos/ContBagGP/experiments/swiss_roll/repro/run_swiss_roll_experiment.sh
+bash /data/ziz/not-backed-up/bouabid/repos/ContBagGP/experiments/swiss_roll/repro/run_parameter_sweep.sh
 echo "Job Completed"
