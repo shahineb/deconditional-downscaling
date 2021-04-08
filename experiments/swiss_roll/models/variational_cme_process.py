@@ -47,8 +47,7 @@ def build_swiss_roll_variational_cme_process(n_inducing_points, lbda,
     if seed:
         torch.random.manual_seed(seed)
     rdm_idx = torch.randperm(len(individuals))[:n_inducing_points]
-    device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
-    inducing_points = individuals[rdm_idx].to(device)
+    inducing_points = individuals[rdm_idx]
 
     # Define model
     model = VariationalCMEProcess(individuals_mean=individuals_mean,
@@ -90,10 +89,8 @@ def train_swiss_roll_variational_cme_process(model, individuals, bags_values, ag
     likelihood = CMEProcessLikelihood(use_individuals_noise=use_individuals_noise)
 
     # Set model in training mode
-    model.train()
-    likelihood.train()
-    model = model.to(device)
-    likelihood = likelihood.to(device)
+    model = model.train().to(device)
+    likelihood = likelihood.train().to(device)
 
     # Define optimizer and elbo module
     parameters = list(model.parameters()) + list(likelihood.parameters())
@@ -151,7 +148,6 @@ def train_swiss_roll_variational_cme_process(model, individuals, bags_values, ag
     torch.save(state, os.path.join(dump_dir, 'state.pt'))
 
 
-
 @PREDICTERS.register('variational_cme_process')
 def predict_swiss_roll_variational_cme_process(model, individuals, **kwargs):
     """Hard-coded prediciton of individuals posterior for Variational CME Process on
@@ -166,14 +162,12 @@ def predict_swiss_roll_variational_cme_process(model, individuals, **kwargs):
 
     """
     # Set model in evaluation mode
-    model = model.cpu()
-    individuals = individuals.cpu()
     model.eval()
 
     # Compute predictive posterior on individuals
     with torch.no_grad():
         individuals_posterior = model(individuals)
 
-    # Set back to trainind mode
+    # Set back to training mode
     model.train()
     return individuals_posterior

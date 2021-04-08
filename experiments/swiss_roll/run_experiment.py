@@ -71,8 +71,8 @@ def main(args, cfg):
     # Compute individuals predictive posterior and plot prediction
     logging.info("Predicting individuals posterior\n")
     predict_kwargs = {'name': cfg['model']['name'],
-                      'model': model,
-                      'individuals': X_gt}
+                      'model': model.cpu(),
+                      'individuals': X_gt.cpu()}
     individuals_posterior = predict(predict_kwargs)
 
     # Save prediction scatter plot

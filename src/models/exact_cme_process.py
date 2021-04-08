@@ -33,12 +33,11 @@ class ExactCMEProcess(ExactGP, CMEProcess):
                          train_targets=train_aggregate_targets,
                          likelihood=likelihood)
 
-        # Setup model tensor attributes
-        self.train_individuals = train_individuals
-        self.train_bags = train_bags
-        self.extended_train_bags = torch.cat([bag_value.repeat(bag_size, 1)
-                                              for (bag_size, bag_value) in zip(bags_sizes, train_bags)]).squeeze()
-        self.train_aggregate_targets = train_aggregate_targets
+        # Register model tensor attributes
+        self.register_buffer('train_individuals', train_individuals)
+        self.register_buffer('train_bags', train_bags)
+        self.register_buffer('extended_train_bags', torch.cat([bag_value.repeat(bag_size, 1) for (bag_size, bag_value) in zip(bags_sizes, train_bags)]).squeeze())
+        self.register_buffer('train_aggregate_targets', train_aggregate_targets)
 
         # Setup model mean/kernel attributes
         self.individuals_mean = individuals_mean

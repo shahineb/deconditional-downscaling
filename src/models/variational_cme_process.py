@@ -36,11 +36,10 @@ class VariationalCMEProcess(ApproximateGP, CMEProcess):
 
         if use_individuals_noise:
             self._init_noise_kernel()
-            self.train_individuals = train_individuals
-            self.train_bags = train_bags
-            self.train_aggregate_targets = train_aggregate_targets
-            self.extended_train_bags = torch.cat([bag_value.repeat(bag_size, 1)
-                                                  for (bag_size, bag_value) in zip(bags_sizes, train_bags)]).squeeze()
+            self.register_buffer('train_individuals', train_individuals)
+            self.register_buffer('train_bags', train_bags)
+            self.register_buffer('extended_train_bags', torch.cat([bag_value.repeat(bag_size, 1) for (bag_size, bag_value) in zip(bags_sizes, train_bags)]).squeeze())
+            self.register_buffer('train_aggregate_targets', train_aggregate_targets)
             self._init_cme_mean_covar_modules(individuals=self.train_individuals,
                                               extended_bags_values=self.extended_train_bags)
 

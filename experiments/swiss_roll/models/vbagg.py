@@ -35,8 +35,7 @@ def build_swiss_roll_vbagg_model(individuals, n_inducing_points, seed, **kwargs)
     if seed:
         torch.random.manual_seed(seed)
     rdm_idx = torch.randperm(len(individuals))[:n_inducing_points]
-    device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
-    inducing_points = individuals[rdm_idx].to(device)
+    inducing_points = individuals[rdm_idx]
 
     # Define model
     model = VariationalGP(inducing_points=inducing_points,
@@ -70,10 +69,8 @@ def train_swiss_roll_vbagg_model(model, individuals, aggregate_targets, bags_siz
     likelihood = VBaggGaussianLikelihood()
 
     # Set model in training mode
-    model.train()
-    likelihood.train()
-    model = model.to(device)
-    likelihood = likelihood.to(device)
+    model = model.train().to(device)
+    likelihood = likelihood.train().to(device)
 
     # Define optimizer and elbo module
     parameters = list(model.parameters()) + list(likelihood.parameters())
@@ -134,8 +131,6 @@ def predict_swiss_roll_vbagg_model(model, individuals, **kwargs):
 
     """
     # Set model in evaluation mode
-    model = model.cpu()
-    individuals = individuals.cpu()
     model.eval()
 
     # Compute predictive posterior on individuals
