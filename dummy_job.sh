@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=swiss_roll_sweep
+#SBATCH --job-name=debug
 #SBATCH --time=00:00:30
 #SBATCH --partition=ziz-gpu
 #SBATCH --gres=gpu:1
@@ -13,4 +13,3 @@
 #python experiments/swiss_roll/run_experiment.py --cfg=experiments/swiss_roll/config/variational_cme_process.yaml --o=sandbox/boo_1 --n_epochs=1
 python experiments/swiss_roll/run_experiment.py --cfg=experiments/swiss_roll/config/vbagg.yaml --o=sandbox/boo_2 --n_epochs=1
 echo "Job Completed"
-

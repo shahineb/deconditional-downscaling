@@ -122,10 +122,16 @@ def make_dataset(cfg):
                                          seed=cfg['seed'])
 
     # Aggregate individuals into bags
-    bags_values, bags_heights = gen.aggregate_bags(X=individuals, bags_sizes=bags_sizes)
+    bags_values, bags_heights = gen.aggregate_bags(X=individuals,
+                                                   bags_sizes=bags_sizes)
 
     # Compute bags aggregate target based on groundtruth
-    aggregate_targets = gen.aggregate_targets(X=X_gt, t=t_gt, bags_heights=bags_heights)
+    aggregate_targets = gen.aggregate_targets(X=X_gt,
+                                              t=t_gt,
+                                              bags_heights=bags_heights,
+                                              individuals_noise=cfg['individuals_noise_variance'],
+                                              aggregate_noise=cfg['aggregate_noise_variance'],
+                                              seed=cfg['seed'])
 
     return bags_sizes, individuals, bags_values, aggregate_targets, X_gt, t_gt
 

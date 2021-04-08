@@ -1,3 +1,4 @@
+import os
 import torch
 import gpytorch
 from progress.bar import Bar
@@ -5,7 +6,7 @@ from models import ExactCMEProcess, MODELS, TRAINERS, PREDICTERS
 
 
 @MODELS.register('exact_cme_process')
-def build_swiss_roll_exact_cme_process(individuals, bags_values, aggregate_targets, bags_sizes, lbda, **kwargs):
+def build_swiss_roll_exact_cme_process(individuals, bags_values, aggregate_targets, bags_sizes, lbda, use_individuals_noise, **kwargs):
     """Hard-coded initialization of Exact CME Process module used for swiss roll experiment
 
     Args:
@@ -14,6 +15,7 @@ def build_swiss_roll_exact_cme_process(individuals, bags_values, aggregate_targe
         aggregate_targets (torch.Tensor)
         bags_sizes (list[int])
         lbda (float)
+        use_individuals_noise (bool)
 
     Returns:
         type: ExactCMEProcess
@@ -44,6 +46,7 @@ def build_swiss_roll_exact_cme_process(individuals, bags_values, aggregate_targe
                             train_aggregate_targets=aggregate_targets,
                             bags_sizes=bags_sizes,
                             lbda=lbda,
+                            use_individuals_noise=use_individuals_noise,
                             likelihood=gpytorch.likelihoods.GaussianLikelihood())
     return model
 
@@ -85,11 +88,16 @@ def train_swiss_roll_exact_cme_process(model, lr, n_epochs, groundtruth_individu
         optimizer.step()
 
         # Update aggregation operators based on new hyperparameters
-        with torch.no_grad():
-            model.update_cme_estimate_parameters()
+        model.update_cme_estimate_parameters()
 
         bar.suffix = f"NLL {loss.item()}"
         bar.next()
+
+    # Save model training state
+    state = {'epoch': n_epochs,
+             'state_dict': model.state_dict(),
+             'optimizer': optimizer.state_dict()}
+    torch.save(state, os.path.join(dump_dir, 'state.pt'))
 
 
 @PREDICTERS.register('exact_cme_process')

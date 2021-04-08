@@ -105,23 +105,32 @@ def aggregate_bags(X, bags_sizes):
     return bags_values, bags_heights
 
 
-def aggregate_targets(X, t, bags_heights):
+@setseed('torch')
+def aggregate_targets(X, t, bags_heights, individuals_noise, aggregate_noise, seed=None):
     """Splits targets by bags height chunks and averages them
 
     Args:
         X (torch.Tensor): (n_samples, 3) tensor
         t (torch.Tensor): (n_samples,)
         bags_heights (list[tuple[float]]): [(zmin, zmax)] of each bag
+        individuals_noise (float): noise variance to add on individuals targets
+        aggregate_noise (float): noise variance to add on aggregate targets
 
     Returns:
         type: Description of returned object.
 
     """
+    # Add random noise on individuals targets
+    noisy_t = t.add(individuals_noise * torch.randn_like(t))
+
     # Adjust lowest/highest heights to match samples in case different tensor
     bags_heights[0][0] = X[:, -1].min().item()
     bags_heights[-1][1] = X[:, -1].max().item()
 
     # Compute aggregate target values by averaging over height chunks
     bags_masks = [(X[:, -1] >= zmin) & (X[:, -1] < zmax) for (zmin, zmax) in bags_heights]
-    aggregate_t = torch.stack([t[mask].mean() for mask in bags_masks])
+    aggregate_t = torch.stack([noisy_t[mask].mean() for mask in bags_masks])
+
+    # Add random noise on aggregate observations
+    aggregate_t.add_(aggregate_noise * torch.randn_like(aggregate_t))
     return aggregate_t

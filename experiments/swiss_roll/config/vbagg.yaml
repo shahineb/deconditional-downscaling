@@ -32,6 +32,12 @@ dataset:
   # Number of samples to use in groundtruth manifold
   n_samples_groundtruth: 10000
 
+  # Variance of noise to apply on individuals targets
+  individuals_noise_variance: 0.2
+
+  # Variance of noise to apply on aggregate targets
+  aggregate_noise_variance: 0.2
+
   # Random seed for dataset generation
   seed: 42
 

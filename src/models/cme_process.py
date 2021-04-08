@@ -1,11 +1,23 @@
 from abc import ABC
 import torch
+from gpytorch.kernels import ScaleKernel
 from src.means import CMEAggregateMean
-from src.kernels import CMEAggregateKernel
+from src.kernels import CMEAggregateKernel, DeltaKernel
 
 
 class CMEProcess(ABC):
     """General class interface methods common to variations of CME process"""
+
+    def _init_noise_kernel(self, raw_noise):
+        """Initializes individuals noise kernel
+
+        Args:
+            raw_noise (float): initialization for raw noise value
+                (i.e. fed to softplus transform in gpytorch)
+
+        """
+        self.noise_kernel = ScaleKernel(base_kernel=DeltaKernel())
+        self.noise_kernel.initialize(raw_outputscale=raw_noise * torch.ones(1))
 
     def _init_cme_mean_covar_modules(self, individuals, extended_bags_values):
         """Initializes CME aggregate mean and covariance modules based on provided
@@ -45,6 +57,8 @@ class CMEProcess(ABC):
         # Evaluate underlying GP mean and covariance on individuals
         latent_individuals_mean = self.individuals_mean(individuals)
         latent_individuals_covar = self.individuals_kernel(individuals)
+        if self.noise_kernel is not None:
+            latent_individuals_covar = latent_individuals_covar + self.noise_kernel(individuals)
 
         # Compute precision matrix of bags values
         bags_covar = self.bag_kernel(extended_bags_values)

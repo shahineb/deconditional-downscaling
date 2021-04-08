@@ -14,6 +14,9 @@ model:
   # Number of inducing points
   n_inducing_points: 200
 
+  # Whether to use noised individuals model or not
+  use_individuals_noise: False
+
   # Random seed for inducing points selection
   seed: 42
 
@@ -32,6 +35,12 @@ dataset:
   # Number of samples to use in groundtruth manifold
   n_samples_groundtruth: 10000
 
+  # Variance of noise to apply on individuals targets
+  individuals_noise_variance: 0.2
+
+  # Variance of noise to apply on aggregate targets
+  aggregate_noise_variance: 0.2
+
   # Random seed for dataset generation
   seed: 42
 
@@ -41,6 +50,9 @@ dataset:
 training:
   # Name of model to use
   name: 'variational_cme_process'
+
+  # Whether to use noised individuals model or not
+  use_individuals_noise: False
 
   # Learning rate
   lr: 0.005

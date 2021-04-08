@@ -113,6 +113,12 @@ def train_swiss_roll_vbagg_model(model, individuals, aggregate_targets, bags_siz
         with open(os.path.join(dump_dir, 'running_metrics.yaml'), 'w') as f:
             yaml.dump({'epoch': metrics}, f)
 
+    # Save model training state
+    state = {'epoch': n_epochs,
+             'state_dict': model.state_dict(),
+             'optimizer': optimizer.state_dict()}
+    torch.save(state, os.path.join(dump_dir, 'state.pt'))
+
 
 @PREDICTERS.register('vbagg')
 def predict_swiss_roll_vbagg_model(model, individuals, **kwargs):

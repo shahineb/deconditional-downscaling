@@ -8,13 +8,19 @@ from core.metrics import compute_metrics
 
 
 @MODELS.register('variational_cme_process')
-def build_swiss_roll_variational_cme_process(individuals, lbda, n_inducing_points, seed, **kwargs):
+def build_swiss_roll_variational_cme_process(n_inducing_points, lbda,
+                                             individuals, bags_values, aggregate_targets,
+                                             bags_sizes, use_individuals_noise, seed, **kwargs):
     """Hard-coded initialization of Variational CME Process module used for swiss roll experiment
 
     Args:
-        individuals (torch.Tensor)
-        lbda (float)
         n_inducing_points (int)
+        lbda (float)
+        individuals (torch.Tensor)
+        bags_values (torch.Tensor)
+        aggregate_targets (torch.Tensor)
+        bags_sizes (list[int])
+        use_individuals_noise (bool)
         seed (int)
 
     Returns:
@@ -49,12 +55,17 @@ def build_swiss_roll_variational_cme_process(individuals, lbda, n_inducing_point
                                   individuals_kernel=individuals_kernel,
                                   bag_kernel=bag_kernel,
                                   inducing_points=inducing_points,
-                                  lbda=lbda)
+                                  lbda=lbda,
+                                  use_individuals_noise=use_individuals_noise,
+                                  train_individuals=individuals,
+                                  train_bags=bags_values,
+                                  train_aggregate_targets=aggregate_targets,
+                                  bags_sizes=bags_sizes)
     return model
 
 
 @TRAINERS.register('variational_cme_process')
-def train_swiss_roll_variational_cme_process(model, individuals, bags_values, aggregate_targets, bags_sizes,
+def train_swiss_roll_variational_cme_process(model, individuals, bags_values, aggregate_targets, bags_sizes, use_individuals_noise,
                                              groundtruth_individuals, groundtruth_targets, lr, n_epochs, beta, dump_dir, **kwargs):
     """Hard-coded training script of Variational CME Process for swiss roll experiment
 
@@ -76,7 +87,7 @@ def train_swiss_roll_variational_cme_process(model, individuals, bags_values, ag
     groundtruth_individuals = groundtruth_individuals.to(device)
 
     # Define variational CME process likelihood
-    likelihood = CMEProcessLikelihood()
+    likelihood = CMEProcessLikelihood(use_individuals_noise=use_individuals_noise)
 
     # Set model in training mode
     model.train()
@@ -106,18 +117,21 @@ def train_swiss_roll_variational_cme_process(model, individuals, bags_values, ag
         q = model(individuals)
 
         # Compute tensors needed for ELBO computation
-        root_inv_extended_bags_covar, bags_to_extended_bags_covar = model.get_elbo_computation_parameters(bags_values=bags_values,
-                                                                                                          extended_bags_values=extended_bags_values)
+        elbo_kwargs = model.get_elbo_computation_parameters(bags_values=bags_values,
+                                                            extended_bags_values=extended_bags_values)
 
         # Compute negative ELBO loss
         loss = -elbo(variational_dist_f=q,
                      target=aggregate_targets,
-                     root_inv_extended_bags_covar=root_inv_extended_bags_covar,
-                     bags_to_extended_bags_covar=bags_to_extended_bags_covar)
+                     **elbo_kwargs)
 
         # Take gradient step
         loss.backward()
         optimizer.step()
+
+        # Update aggregation operators based on new hyperparameters
+        if likelihood.use_individuals_noise:
+            model.update_cme_estimate_parameters()
 
         bar.suffix = f"ELBO {-loss.item()}"
         bar.next()
@@ -129,6 +143,13 @@ def train_swiss_roll_variational_cme_process(model, individuals, bags_values, ag
         metrics[epoch + 1] = epoch_metrics
         with open(os.path.join(dump_dir, 'running_metrics.yaml'), 'w') as f:
             yaml.dump({'epoch': metrics}, f)
+
+    # Save model training state
+    state = {'epoch': n_epochs,
+             'state_dict': model.state_dict(),
+             'optimizer': optimizer.state_dict()}
+    torch.save(state, os.path.join(dump_dir, 'state.pt'))
+
 
 
 @PREDICTERS.register('variational_cme_process')

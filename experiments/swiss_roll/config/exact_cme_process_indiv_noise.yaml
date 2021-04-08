@@ -12,7 +12,7 @@ model:
   lbda: 0.01
 
   # Whether to use noised individuals model or not
-  use_individuals_noise: False
+  use_individuals_noise: True
 
 
 # DATASET

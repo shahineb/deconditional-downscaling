@@ -25,25 +25,32 @@ class ExactCMEProcess(ExactGP, CMEProcess):
 
     """
     def __init__(self, train_individuals, train_bags, train_aggregate_targets,
-                 individuals_mean, individuals_kernel,
-                 bag_kernel, bags_sizes, lbda, likelihood, extended_train_bags=None):
+                 individuals_mean, individuals_kernel, bag_kernel,
+                 bags_sizes, lbda, likelihood, use_individuals_noise=True, extended_train_bags=None):
 
         # Initialize exact GP model attributes
         super().__init__(train_inputs=train_bags,
                          train_targets=train_aggregate_targets,
                          likelihood=likelihood)
 
-        # Setup model attributes
+        # Setup model tensor attributes
         self.train_individuals = train_individuals
         self.train_bags = train_bags
+        self.extended_train_bags = torch.cat([bag_value.repeat(bag_size, 1)
+                                              for (bag_size, bag_value) in zip(bags_sizes, train_bags)]).squeeze()
         self.train_aggregate_targets = train_aggregate_targets
+
+        # Setup model mean/kernel attributes
         self.individuals_mean = individuals_mean
         self.individuals_kernel = individuals_kernel
         self.bag_kernel = bag_kernel
+        self.noise_kernel = None
+        if use_individuals_noise:
+            self._init_noise_kernel()
+
+        # Setup model auxilliary attributes
         self.bags_sizes = bags_sizes
         self.lbda = lbda
-        self.extended_train_bags = torch.cat([bag_value.repeat(bag_size, 1)
-                                              for (bag_size, bag_value) in zip(bags_sizes, train_bags)]).squeeze()
 
         # Initialize CME aggregate mean and covariance functions
         self._init_cme_mean_covar_modules(individuals=self.train_individuals,
@@ -62,6 +69,13 @@ class ExactCMEProcess(ExactGP, CMEProcess):
                                                   'train_aggregate_targets': self.train_aggregate_targets,
                                                   'likelihood': self.likelihood}
         self.individuals_prediction_strategy = ExactCMEPredictionStrategy(**individuals_prediction_strategy_kwargs)
+
+    def _init_noise_kernel(self):
+        """Initializes individuals noise kernel with 0.6932 = softplus(0)
+            - default gpytorch likelihood noise value
+
+        """
+        super()._init_noise_kernel(raw_noise=0.)
 
     def update_cme_estimate_parameters(self):
         """Update values of parameters used for CME estimate in mean and
