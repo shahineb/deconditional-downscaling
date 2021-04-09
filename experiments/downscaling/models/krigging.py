@@ -5,114 +5,84 @@ import gpytorch
 import matplotlib.pyplot as plt
 from sklearn.cluster import KMeans
 from progress.bar import Bar
-from models import VariationalCMEProcess, CMEProcessLikelihood, MODELS, TRAINERS, PREDICTERS
+from models import VariationalGP, MODELS, TRAINERS, PREDICTERS
 from core.visualization import plot_downscaling_prediction
 from core.metrics import compute_metrics
 
 
-@MODELS.register('variational_cme_process')
-def build_downscaling_variational_cme_process(covariates_grid, lbda, n_inducing_points, seed, **kwargs):
-    """Hard-coded initialization of Variational CME Process module used for downscaling experiment
+@MODELS.register('krigging')
+def build_downscaling_variational_krigging(bags_blocks, n_inducing_points, seed, **kwargs):
+    """Hard-coded initialization of ExactGP module used for swiss roll experiment
 
     Args:
-        individuals (torch.Tensor)
-        lbda (float)
-        n_inducing_points (int)
-        seed (int)
+        bags_values (torch.Tensor)
+        aggregate_targets (torch.Tensor)
 
     Returns:
-        type: VariationalCMEProcess
+        type: ExactGP
 
     """
     # Inverse softplus utility for gpytorch lengthscale intialization
     inv_softplus = lambda x, n: torch.log(torch.exp(x * torch.ones(n)) - 1)
 
     # Define mean and covariance modules
-    individuals_mean = gpytorch.means.ZeroMean()
+    mean_module = gpytorch.means.ZeroMean()
 
     # Define individuals kernel
-    base_indiv_spatial_kernel = gpytorch.kernels.MaternKernel(nu=0.5, ard_num_dims=3, active_dims=[0, 1, 2])
-    base_indiv_spatial_kernel.initialize(raw_lengthscale=inv_softplus(x=1, n=3))
+    base_spatial_kernel = gpytorch.kernels.MaternKernel(nu=0.5, ard_num_dims=3, active_dims=[0, 1, 2])
+    base_spatial_kernel.initialize(raw_lengthscale=inv_softplus(x=1, n=3))
 
-    base_indiv_feat_kernel = gpytorch.kernels.MaternKernel(nu=0.5, ard_num_dims=3, active_dims=[3, 4, 5])
-    base_indiv_feat_kernel.initialize(raw_lengthscale=inv_softplus(x=1, n=3))
+    base_feat_kernel = gpytorch.kernels.MaternKernel(nu=0.5, ard_num_dims=3, active_dims=[3, 4, 5])
+    base_feat_kernel.initialize(raw_lengthscale=inv_softplus(x=1, n=3))
 
-    individuals_spatial_kernel = gpytorch.kernels.ScaleKernel(base_indiv_spatial_kernel)
-    individuals_feat_kernel = gpytorch.kernels.ScaleKernel(base_indiv_feat_kernel)
-    individuals_kernel = individuals_spatial_kernel + individuals_feat_kernel
+    spatial_kernel = gpytorch.kernels.ScaleKernel(base_spatial_kernel)
+    feat_kernel = gpytorch.kernels.ScaleKernel(base_feat_kernel)
+    covar_module = spatial_kernel + feat_kernel
 
-    # Define bags kernels
-    base_bag_spatial_kernel = gpytorch.kernels.MaternKernel(nu=0.5, ard_num_dims=3, active_dims=[0, 1, 2])
-    base_bag_spatial_kernel.initialize(raw_lengthscale=inv_softplus(x=1, n=3))
-
-    base_bag_feat_kernel = gpytorch.kernels.MaternKernel(nu=0.5, ard_num_dims=3, active_dims=[3, 4, 5])
-    base_bag_feat_kernel.initialize(raw_lengthscale=inv_softplus(x=1, n=3))
-
-    bag_spatial_kernel = gpytorch.kernels.ScaleKernel(base_bag_spatial_kernel)
-    bag_feat_kernel = gpytorch.kernels.ScaleKernel(base_bag_feat_kernel)
-    bag_kernel = bag_spatial_kernel + bag_feat_kernel
-
-    # Select inducing points
+    # Initialize inducing points with kmeans
     kmeans = KMeans(n_clusters=n_inducing_points, init='k-means++', random_state=seed)
-    kmeans.fit(covariates_grid.view(-1, covariates_grid.size(-1)))
+    kmeans.fit(bags_blocks)
     inducing_points = torch.from_numpy(kmeans.cluster_centers_).float()
 
     # Define model
-    model = VariationalCMEProcess(individuals_mean=individuals_mean,
-                                  individuals_kernel=individuals_kernel,
-                                  bag_kernel=bag_kernel,
-                                  inducing_points=inducing_points,
-                                  lbda=lbda)
+    model = VariationalGP(inducing_points=inducing_points,
+                          mean_module=mean_module,
+                          covar_module=covar_module)
     return model
 
 
-@TRAINERS.register('variational_cme_process')
-def train_downscaling_variational_cme_process(model, covariates_blocks, bags_blocks, extended_bags, targets_blocks,
-                                              lr, n_epochs, batch_size, beta, seed, dump_dir, covariates_grid,
-                                              step_size, groundtruth_field, target_field, plot, **kwargs):
-    """Hard-coded training script of Exact CME Process for downscaling experiment
+@TRAINERS.register('krigging')
+def train_downscaling_variational_krigging(model, bags_blocks, targets_blocks,
+                                           lr, n_epochs, batch_size, beta, seed, dump_dir, covariates_grid,
+                                           step_size, groundtruth_field, target_field, plot, **kwargs):
+    """Hard-coded training script of Vbagg model for swiss roll experiment
 
     Args:
         model (VariationalGP)
-        covariates_blocks (torch.Tensor)
-        bags_blocks (torch.Tensor)
-        extended_bags (torch.Tensor)
-        targets_blocks (torch.Tensor)
+        individuals (torch.Tensor)
+        aggregate_targets (torch.Tensor)
+        bags_sizes (list[int])
         lr (float)
         n_epochs (int)
         beta (float)
-        batch_size (int)
-        seed (int)
-        dump_dir (str)
-        covariates_grid (torch.Tensor)
-        step_size (int)
-        groundtruth_field (xarray.core.dataarray.DataArray)
-        target_field (torch.Tensor)
-        plot (bool)
 
     """
     # Transfer on device
     device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
     covariates_grid = covariates_grid.to(device)
-    covariates_blocks = covariates_blocks.to(device)
     bags_blocks = bags_blocks.to(device)
-    extended_bags = extended_bags.to(device)
     targets_blocks = targets_blocks.to(device)
 
     # Define stochastic batch iterator
     def batch_iterator(batch_size):
         rdm_indices = torch.randperm(len(targets_blocks)).to(device)
-        n_dim_individuals = covariates_blocks.size(-1)
-        n_dim_bags = bags_blocks.size(-1)
         for idx in rdm_indices.split(batch_size):
-            x = covariates_blocks[idx].reshape(-1, n_dim_individuals)
             y = bags_blocks[idx]
-            extended_y = extended_bags[idx].reshape(-1, n_dim_bags)
             z = targets_blocks[idx]
-            yield x, y, extended_y, z
+            yield y, z
 
     # Define variational CME process likelihood
-    likelihood = CMEProcessLikelihood()
+    likelihood = gpytorch.likelihood.GaussianLikelihood()
 
     # Set model in training mode
     model = model.train().to(device)
@@ -136,22 +106,15 @@ def train_downscaling_variational_cme_process(model, covariates_blocks, bags_blo
 
         batch_bar = Bar("Batch", max=len(targets_blocks) // batch_size)
 
-        for x, y, extended_y, z in batch_iterator(batch_size):
+        for y, z in batch_iterator(batch_size):
             # Zero-out remaining gradients
             optimizer.zero_grad()
 
             # Compute q(f)
-            q = model(x)
-
-            # Compute tensors needed for ELBO computation
-            root_inv_extended_bags_covar, bags_to_extended_bags_covar = model.get_elbo_computation_parameters(bags_values=y,
-                                                                                                              extended_bags_values=extended_y)
+            q = model(y)
 
             # Compute negative ELBO loss
-            loss = -elbo(variational_dist_f=q,
-                         target=z,
-                         root_inv_extended_bags_covar=root_inv_extended_bags_covar,
-                         bags_to_extended_bags_covar=bags_to_extended_bags_covar)
+            loss = -elbo(variational_dist_f=q, target=z)
 
             # Take gradient step
             loss.backward()
@@ -161,10 +124,10 @@ def train_downscaling_variational_cme_process(model, covariates_blocks, bags_blo
             batch_bar.next()
 
         # Compute posterior distribution at current epoch and store metrics
-        individuals_posterior = predict_downscaling_variational_cme_process(model=model,
-                                                                            covariates_grid=covariates_grid,
-                                                                            step_size=step_size,
-                                                                            target_field=target_field)
+        individuals_posterior = predict_downscaling_variational_krigging(model=model,
+                                                                         covariates_grid=covariates_grid,
+                                                                         step_size=step_size,
+                                                                         target_field=target_field)
         epoch_metrics = compute_metrics(individuals_posterior, groundtruth_field)
         metrics[epoch + 1] = epoch_metrics
         with open(os.path.join(dump_dir, 'running_metrics.yaml'), 'w') as f:
@@ -180,7 +143,7 @@ def train_downscaling_variational_cme_process(model, covariates_blocks, bags_blo
 
 
 @PREDICTERS.register('variational_cme_process')
-def predict_downscaling_variational_cme_process(model, covariates_grid, step_size, target_field, **kwargs):
+def predict_downscaling_variational_krigging(model, covariates_grid, step_size, target_field, **kwargs):
     """Hard-coded prediciton of individuals posterior for Variational CME Process on
     downscaling experiment
 
@@ -197,9 +160,6 @@ def predict_downscaling_variational_cme_process(model, covariates_grid, step_siz
 
     """
     # Set model in evaluation mode
-    device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
-    covariates_grid = covariates_grid.to(device)
-    model = model.to(device)
     model.eval()
 
     # Compute predictive posterior on individuals

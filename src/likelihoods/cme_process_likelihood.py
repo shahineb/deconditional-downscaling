@@ -1,6 +1,6 @@
 import numpy as np
 import torch
-from gpytorch import lazy
+from gpytorch import lazy, settings
 from gpytorch.likelihoods import GaussianLikelihood
 
 
@@ -72,12 +72,13 @@ class CMEProcessLikelihood(GaussianLikelihood):
         C = cme_aggregate_covar.add_diag(self.noise * torch.ones(cme_aggregate_covar.size(0), device=cme_aggregate_covar.device))
         C = C - fact_A @ (root_inv_extended_bags_covar.t() @ fact_upsilon.t())
 
-        # Compute mean likelihood term (z - A^Tμ)^T C^{-1}(z - A^Tμ)
-        mean_term = C.inv_quad(observations - fact_A @ (root_inv_extended_bags_covar.t() @ variational_mean))
+        with settings.cholesky_jitter(1e-1):
+            # Compute mean likelihood term (z - A^Tμ)^T C^{-1}(z - A^Tμ)
+            mean_term = C.inv_quad(observations - fact_A @ (root_inv_extended_bags_covar.t() @ variational_mean))
 
-        # Compute covariance likelihood term tr(Σpost^{1/2}T A C^{-1} A^T Σpost^{1/2})
-        buffer = fact_A @ (root_inv_extended_bags_covar.t() @ variational_root_covar)
-        covar_term, logdetC = C.inv_quad_logdet(buffer.evaluate(), logdet=True)
+            # Compute covariance likelihood term tr(Σpost^{1/2}T A C^{-1} A^T Σpost^{1/2})
+            buffer = fact_A @ (root_inv_extended_bags_covar.t() @ variational_root_covar)
+            covar_term, logdetC = C.inv_quad_logdet(buffer.evaluate(), logdet=True)
 
         # Sum up everything to obtain expected logprob under variational distribution
         constant_term = len(observations) * (np.log(2 * np.pi))

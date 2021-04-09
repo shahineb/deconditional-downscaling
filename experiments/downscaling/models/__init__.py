@@ -4,7 +4,7 @@ import sys
 base_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "../../..")
 sys.path.append(base_dir)
 
-from src.models import VariationalCMEProcess
+from src.models import VariationalGP, VariationalCMEProcess
 from src.likelihoods import CMEProcessLikelihood
 from src.utils import Registry
 """
@@ -30,3 +30,4 @@ def predict(cfg):
 
 
 from .variational_cme_process import *
+from .krigging import *

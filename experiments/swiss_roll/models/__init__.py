@@ -1,4 +1,4 @@
-from src.models import ExactCMEProcess, VariationalCMEProcess, VariationalGP
+from src.models import ExactGP, VariationalGP, ExactCMEProcess, VariationalCMEProcess
 from src.likelihoods import CMEProcessLikelihood, VBaggGaussianLikelihood
 from src.utils import Registry
 """
@@ -27,3 +27,4 @@ from .exact_cme_process import *
 from .variational_cme_process import *
 from .linear_interpolation import *
 from .vbagg import *
+from .gp_regression import *
