@@ -12,7 +12,7 @@ from core.metrics import compute_metrics
 
 @MODELS.register('krigging')
 def build_downscaling_variational_krigging(bags_blocks, n_inducing_points, seed, **kwargs):
-    """Hard-coded initialization of ExactGP module used for swiss roll experiment
+    """Hard-coded initialization of ExactGP module used for downscaling experiment
 
     Args:
         bags_values (torch.Tensor)
@@ -55,7 +55,7 @@ def build_downscaling_variational_krigging(bags_blocks, n_inducing_points, seed,
 def train_downscaling_variational_krigging(model, bags_blocks, targets_blocks,
                                            lr, n_epochs, batch_size, beta, seed, dump_dir, covariates_grid,
                                            step_size, groundtruth_field, target_field, plot, **kwargs):
-    """Hard-coded training script of Vbagg model for swiss roll experiment
+    """Hard-coded training script of Vbagg model for downscaling experiment
 
     Args:
         model (VariationalGP)
@@ -140,6 +140,12 @@ def train_downscaling_variational_krigging(model, bags_blocks, targets_blocks,
             plt.close()
         epoch_bar.next()
         epoch_bar.finish()
+
+    # Save model training state
+    state = {'epoch': n_epochs,
+             'state_dict': model.state_dict(),
+             'optimizer': optimizer.state_dict()}
+    torch.save(state, os.path.join(dump_dir, 'state.pt'))
 
 
 @PREDICTERS.register('variational_cme_process')
