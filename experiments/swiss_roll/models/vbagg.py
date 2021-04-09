@@ -2,6 +2,7 @@ import os
 import yaml
 import torch
 import gpytorch
+from sklearn.cluster import KMeans
 from progress.bar import Bar
 from models import VariationalGP, VBaggGaussianLikelihood, MODELS, TRAINERS, PREDICTERS
 from core.metrics import compute_metrics
@@ -31,11 +32,10 @@ def build_swiss_roll_vbagg_model(individuals, n_inducing_points, seed, **kwargs)
     base_individuals_kernel.initialize(raw_lengthscale=inv_softplus(x=1, n=3))
     individuals_kernel = gpytorch.kernels.ScaleKernel(base_individuals_kernel)
 
-    # Select inducing points
-    if seed:
-        torch.random.manual_seed(seed)
-    rdm_idx = torch.randperm(len(individuals))[:n_inducing_points]
-    inducing_points = individuals[rdm_idx]
+    # Initialize inducing points with kmeans
+    kmeans = KMeans(n_clusters=n_inducing_points, init='k-means++', random_state=seed)
+    kmeans.fit(individuals)
+    inducing_points = torch.from_numpy(kmeans.cluster_centers_).float()
 
     # Define model
     model = VariationalGP(inducing_points=inducing_points,

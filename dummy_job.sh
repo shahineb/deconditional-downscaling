@@ -9,7 +9,9 @@
 #SBATCH --error=/data/ziz/not-backed-up/bouabid/tmp/slurm-%A_%a.o
 
 #pyenv activate deconditioning
-#python experiments/swiss_roll/run_experiment.py --cfg=experiments/swiss_roll/config/exact_cme_process.yaml --o=sandbox/boo --n_epochs=1
-#python experiments/swiss_roll/run_experiment.py --cfg=experiments/swiss_roll/config/variational_cme_process.yaml --o=sandbox/boo_1 --n_epochs=1
-python experiments/swiss_roll/run_experiment.py --cfg=experiments/swiss_roll/config/vbagg.yaml --o=sandbox/boo_2 --n_epochs=1
+python experiments/swiss_roll/run_experiment.py --cfg=experiments/swiss_roll/config/exact_cme_process.yaml --o=sandbox/boo_exact_wo --n_epochs=2
+python experiments/swiss_roll/run_experiment.py --cfg=experiments/swiss_roll/config/exact_cme_process_indiv_noise.yaml --o=sandbox/boo_exact_w --n_epochs=2
+python experiments/swiss_roll/run_experiment.py --cfg=experiments/swiss_roll/config/variational_cme_process.yaml --o=sandbox/boo_var_wo --n_epochs=2
+python experiments/swiss_roll/run_experiment.py --cfg=experiments/swiss_roll/config/variational_cme_process_indiv_noise.yaml --o=sandbox/boo_var_w --n_epochs=2
+python experiments/swiss_roll/run_experiment.py --cfg=experiments/swiss_roll/config/vbagg.yaml --o=sandbox/boo_vbagg --n_epochs=2
 echo "Job Completed"

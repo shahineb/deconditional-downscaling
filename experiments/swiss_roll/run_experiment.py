@@ -25,6 +25,7 @@ import yaml
 import logging
 from docopt import docopt
 import torch
+import gpytorch
 import matplotlib.pyplot as plt
 import core.generation as gen
 import core.visualization as vis
@@ -169,9 +170,10 @@ def evaluate_model(cfg, model, individuals_posterior, X_gt, t_gt, output_dir):
     predict_kwargs = {'name': cfg['model']['name'],
                       'model': model,
                       'individuals': sub_individuals}
-    sub_individuals_posterior = predict(predict_kwargs)
-    with torch.no_grad():
-        nll = -sub_individuals_posterior.log_prob(sub_individuals_target).div(n_individuals)
+    with gpytorch.settings.fast_computations(log_prob=False, covar_root_decomposition=False):
+        sub_individuals_posterior = predict(predict_kwargs)
+        with torch.no_grad():
+            nll = -sub_individuals_posterior.log_prob(sub_individuals_target).div(n_individuals)
 
     # Record and dump as YAML file
     individuals_metrics.update(nll=nll.item())
