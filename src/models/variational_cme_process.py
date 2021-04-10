@@ -7,7 +7,7 @@ from src.variational import VariationalStrategy
 
 
 class VariationalCMEProcess(ApproximateGP, CMEProcess):
-    """Sparse variational KCMP
+    """Sparse Variational Kernel Conditional Mean Process
 
     Args:
         inducing_points (torch.Tensor): tensor of landmark points from which to
@@ -18,11 +18,10 @@ class VariationalCMEProcess(ApproximateGP, CMEProcess):
             used for individuals GP prior
         bag_kernel (gpytorch.kernels.Kernel): kernel module used for bag values
         lbda (float): inversion regularization parameter
+        use_individuals_noise (bool): if True, uses individuals level noise modelling
     """
     def __init__(self, inducing_points, individuals_mean,
-                 individuals_kernel, bag_kernel, lbda,
-                 train_individuals=None, train_bags=None, train_aggregate_targets=None,
-                 bags_sizes=None, use_individuals_noise=True):
+                 individuals_kernel, bag_kernel, lbda, use_individuals_noise=True):
         # Initialize variational strategy
         variational_strategy = self._set_variational_strategy(inducing_points)
         super().__init__(variational_strategy=variational_strategy)
@@ -36,12 +35,6 @@ class VariationalCMEProcess(ApproximateGP, CMEProcess):
 
         if use_individuals_noise:
             self._init_noise_kernel()
-            self.register_buffer('train_individuals', train_individuals)
-            self.register_buffer('train_bags', train_bags)
-            self.register_buffer('extended_train_bags', torch.cat([bag_value.repeat(bag_size, 1) for (bag_size, bag_value) in zip(bags_sizes, train_bags)]).squeeze())
-            self.register_buffer('train_aggregate_targets', train_aggregate_targets)
-            self._init_cme_mean_covar_modules(individuals=self.train_individuals,
-                                              extended_bags_values=self.extended_train_bags)
 
     def _set_variational_strategy(self, inducing_points):
         """Sets variational family of distribution to use and variational approximation
@@ -90,17 +83,6 @@ class VariationalCMEProcess(ApproximateGP, CMEProcess):
                                                               covariance_matrix=covar)
         return prior_distribution
 
-    def update_cme_estimate_parameters(self):
-        """Update values of parameters used for CME estimate in mean and
-            covariance modules
-
-        individuals (torch.Tensor): (N, d) tensor of individuals inputs
-        extended_bags_values (torch.Tensor): (N, r) tensor of individuals bags values
-
-        """
-        return super().update_cme_estimate_parameters(individuals=self.train_individuals,
-                                                      extended_bags_values=self.extended_train_bags)
-
     def get_elbo_computation_parameters(self, bags_values, extended_bags_values):
         """Computes tensors required to derive expected logprob term in elbo loss
 
@@ -124,15 +106,8 @@ class VariationalCMEProcess(ApproximateGP, CMEProcess):
         output = {'root_inv_extended_bags_covar': root_inv_extended_bags_covar,
                   'bags_to_extended_bags_covar': bags_to_extended_bags_covar}
 
-        # Additional tensors needed if using individuals noise model
+        # Include individuals noise if used
         if self.noise_kernel is not None:
-            # Compute aggregate kernel covariance Q
-            cme_aggregate_covar = self.covar_module(self.train_bags)
+            output.update({'individuals_noise': self.noise_kernel.outputscale})
 
-            # Comupte individuals covariance K
-            individuals_covar = self.individuals_kernel(self.train_individuals)
-
-            # Record in output dictionnary
-            output.update({'cme_aggregate_covar': cme_aggregate_covar,
-                           'individuals_covar': individuals_covar})
         return output

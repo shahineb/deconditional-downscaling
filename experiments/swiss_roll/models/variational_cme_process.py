@@ -126,10 +126,7 @@ def train_swiss_roll_variational_cme_process(model, individuals, bags_values, ag
         loss.backward()
         optimizer.step()
 
-        # Update aggregation operators based on new hyperparameters
-        if likelihood.use_individuals_noise:
-            model.update_cme_estimate_parameters()
-
+        # Update progress bar
         bar.suffix = f"ELBO {-loss.item()}"
         bar.next()
 

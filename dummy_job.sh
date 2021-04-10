@@ -14,4 +14,10 @@ python experiments/swiss_roll/run_experiment.py --cfg=experiments/swiss_roll/con
 python experiments/swiss_roll/run_experiment.py --cfg=experiments/swiss_roll/config/variational_cme_process.yaml --o=sandbox/boo_var_wo --n_epochs=2
 python experiments/swiss_roll/run_experiment.py --cfg=experiments/swiss_roll/config/variational_cme_process_indiv_noise.yaml --o=sandbox/boo_var_w --n_epochs=2
 python experiments/swiss_roll/run_experiment.py --cfg=experiments/swiss_roll/config/vbagg.yaml --o=sandbox/boo_vbagg --n_epochs=2
+
+# python experiments/swiss_roll/run_experiment.py --cfg=experiments/swiss_roll/config/exact_cme_process.yaml --o=sandbox/sandbox/exact_wo_noise --plot
+# python experiments/swiss_roll/run_experiment.py --cfg=experiments/swiss_roll/config/exact_cme_process_indiv_noise.yaml --o=sandbox/sandbox/exact_w_noise --plot
+# python experiments/swiss_roll/run_experiment.py --cfg=experiments/swiss_roll/config/variational_cme_process.yaml --o=sandbox/sandbox/var_wo_noise --plot
+# python experiments/swiss_roll/run_experiment.py --cfg=experiments/swiss_roll/config/variational_cme_process_indiv_noise.yaml --o=sandbox/sandbox/var_w_noise --plot --n_epochs=300
+# python experiments/swiss_roll/run_experiment.py --cfg=experiments/swiss_roll/config/vbagg.yaml --o=sandbox/sandbox/vbagg --plot
 echo "Job Completed"
