@@ -4,7 +4,17 @@ from gpytorch import kernels, lazy
 
 
 class RFFKernel(kernels.RFFKernel):
+    """Computes covariance matrix based on Random Fourier Features approximation
 
+        Works for RBF and Laplace kernels
+
+    Args:
+        num_samples (int): number of random frequencies to draw
+        num_dims (int): data space dimensionality, if unspecified will be inferred at
+            first forward call
+        which (str): kernel choice in {'rbf', 'laplace'}
+
+    """
     __which__ = {'rbf', 'laplace'}
 
     def __init__(self, num_samples, num_dims=None, which='rbf', **kwargs):
@@ -12,6 +22,12 @@ class RFFKernel(kernels.RFFKernel):
         super().__init__(num_samples=num_samples, num_dims=num_dims, **kwargs)
 
     def _init_base_distribution(self, which):
+        """Initializes frequencies samping distribution
+
+        Args:
+            which (str): kernel choice in {'rbf', 'laplace'}
+
+        """
         if which == 'rbf':
             self.base_distribution = torch.distributions.Normal(loc=torch.zeros(1), scale=torch.ones(1))
         elif which == 'laplace':
@@ -20,7 +36,15 @@ class RFFKernel(kernels.RFFKernel):
             raise ValueError(f"Unknown distribution, only supports {self.__which__}")
         self.which = which
 
-    def _init_weights(self, num_dims, num_samples=None, rand_weights=None):
+    def _init_weights(self, num_samples=None, num_dims=None, rand_weights=None):
+        """Short summary.
+
+        Args:
+            num_samples (int): number of random frequencies to draw
+            num_dims (int): data space dimensionality
+            rand_weights (torch.Tensor): pre-sampled random frequencies
+
+        """
         if num_dims is not None and num_samples is not None:
             d = num_dims
             D = num_samples
