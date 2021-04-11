@@ -17,8 +17,8 @@ class CMEAggregateKernel(kernels.Kernel):
     def __init__(self, bag_kernel, bags_values, individuals_covar, root_inv_bags_covar):
         super().__init__()
         self.bag_kernel = bag_kernel
-        self.individuals_covar = individuals_covar
         self.register_buffer('bags_values', bags_values)
+        self.individuals_covar = individuals_covar
         self.root_inv_bags_covar = root_inv_bags_covar
 
     def forward(self, x1, x2, **kwargs):
@@ -68,8 +68,3 @@ class CMEAggregateKernel(kernels.Kernel):
         bar = self.root_inv_bags_covar.t() @ self.individuals_covar @ self.root_inv_bags_covar
         output = foo_1 @ bar @ foo_2
         return output
-
-    def to(self, *args, **kwargs):
-        super().to(*args, **kwargs)
-        self.root_inv_bags_covar.to(*args, **kwargs)
-        return self

@@ -28,8 +28,9 @@ class CMEProcess(ABC):
             extended_bags_values (torch.Tensor): (N, r) tensor of individuals bags values
         """
         # Evaluate tensors needed to compute CME estimate
-        latent_individuals_mean, latent_individuals_covar, root_inv_bags_covar = self._get_cme_estimate_parameters(individuals=individuals,
-                                                                                                                   extended_bags_values=extended_bags_values)
+        with torch.no_grad():
+            latent_individuals_mean, latent_individuals_covar, root_inv_bags_covar = self._get_cme_estimate_parameters(individuals=individuals,
+                                                                                                                       extended_bags_values=extended_bags_values)
 
         # Initialize CME aggregate mean and covariance functions
         mean_module_kwargs = {'bag_kernel': self.bag_kernel,
@@ -76,11 +77,11 @@ class CMEProcess(ABC):
         """
         latent_individuals_mean, latent_individuals_covar, root_inv_bags_covar = self._get_cme_estimate_parameters(individuals=individuals,
                                                                                                                    extended_bags_values=extended_bags_values)
-        self.mean_module.root_inv_bags_covar = root_inv_bags_covar
         self.mean_module.bags_values = extended_bags_values
+        self.mean_module.root_inv_bags_covar = root_inv_bags_covar
+        self.covar_module.bags_values = extended_bags_values
         self.covar_module.individuals_covar = latent_individuals_covar
         self.covar_module.root_inv_bags_covar = root_inv_bags_covar
-        self.covar_module.bags_values = extended_bags_values
 
     def get_individuals_to_cme_covar(self, input_individuals, individuals, bags_values, extended_bags_values):
         """Computes covariance between latent individuals GP evaluated on input

@@ -152,3 +152,17 @@ class ExactCMEProcess(ExactGP, CMEProcess):
         individuals_posterior = MultivariateNormal(mean=individuals_posterior_mean,
                                                    covariance_matrix=individuals_posterior_covar)
         return individuals_posterior
+
+    def to(self, *args, **kwargs):
+        self = super().to(*args, **kwargs)
+        self.mean_module.root_inv_bags_covar = self.mean_module.root_inv_bags_covar.to(*args, **kwargs)
+        self.covar_module.individuals_covar = self.covar_module.individuals_covar.to(*args, **kwargs)
+        self.covar_module.root_inv_bags_covar = self.covar_module.root_inv_bags_covar.to(*args, **kwargs)
+        return self
+
+    def cpu(self, *args, **kwargs):
+        self = super().cpu(*args, **kwargs)
+        self.mean_module.root_inv_bags_covar = self.mean_module.root_inv_bags_covar.cpu(*args, **kwargs)
+        self.covar_module.individuals_covar = self.covar_module.individuals_covar.cpu(*args, **kwargs)
+        self.covar_module.root_inv_bags_covar = self.covar_module.root_inv_bags_covar.cpu(*args, **kwargs)
+        return self

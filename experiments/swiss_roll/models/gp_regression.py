@@ -40,7 +40,7 @@ def build_swiss_roll_gp_regressor(bags_values, aggregate_targets, **kwargs):
 
 
 @TRAINERS.register('gp_regression')
-def train_swiss_roll_gp_regressor(model, lr, n_epochs, groundtruth_individuals,
+def train_swiss_roll_gp_regressor(model, bags_values, aggregate_targets, lr, n_epochs, groundtruth_individuals,
                                   groundtruth_targets, dump_dir, **kwargs):
     """Hard-coded training script of Exact GP for swiss roll experiment
 
@@ -55,6 +55,8 @@ def train_swiss_roll_gp_regressor(model, lr, n_epochs, groundtruth_individuals,
     """
     # Move tensors to device
     device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
+    bags_values = bags_values.to(device)
+    aggregate_targets = aggregate_targets.to(device)
     groundtruth_individuals = groundtruth_individuals.to(device)
     groundtruth_targets = groundtruth_targets.to(device)
 
@@ -76,18 +78,16 @@ def train_swiss_roll_gp_regressor(model, lr, n_epochs, groundtruth_individuals,
         optimizer.zero_grad()
 
         # Compute marginal distribution p(.|x,y)
-        output = model(model.train_x)
+        output = model(bags_values)
 
         # Evaluate -logp(z|x, y) on aggregate observations z
-        loss = -mll(output, model.train_y)
+        loss = -mll(output, aggregate_targets)
 
         # Take gradient step
         loss.backward()
         optimizer.step()
 
-        # Update aggregation operators based on new hyperparameters
-        model.update_cme_estimate_parameters()
-
+        # Update progress bar
         bar.suffix = f"NLL {loss.item()}"
         bar.next()
 
