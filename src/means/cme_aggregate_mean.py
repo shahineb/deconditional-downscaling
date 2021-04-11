@@ -17,9 +17,9 @@ class CMEAggregateMean(means.Mean):
     def __init__(self, bag_kernel, bags_values, individuals_mean, root_inv_bags_covar):
         super().__init__()
         self.bag_kernel = bag_kernel
-        self.bags_values = bags_values
         self.individuals_mean = individuals_mean
-        self.root_inv_bags_covar = root_inv_bags_covar
+        self.register_buffer('bags_values', bags_values)
+        self.register_buffer('root_inv_bags_covar', root_inv_bags_covar)
 
     def forward(self, x):
         """Compute CME aggregate mean

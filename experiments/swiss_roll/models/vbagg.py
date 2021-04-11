@@ -59,11 +59,12 @@ def train_swiss_roll_vbagg_model(model, individuals, aggregate_targets, bags_siz
         beta (float)
 
     """
-    # Transfer on device
+    # Transfer tensors on device
     device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
     individuals = individuals.to(device)
     aggregate_targets = aggregate_targets.to(device)
     groundtruth_individuals = groundtruth_individuals.to(device)
+    groundtruth_targets = groundtruth_targets.to(device)
 
     # Define VBAGG likelihood
     likelihood = VBaggGaussianLikelihood()
@@ -105,7 +106,7 @@ def train_swiss_roll_vbagg_model(model, individuals, aggregate_targets, bags_siz
         # Compute posterior distribution at current epoch and store metrics
         individuals_posterior = predict_swiss_roll_vbagg_model(model=model,
                                                                individuals=groundtruth_individuals)
-        epoch_metrics = compute_metrics(individuals_posterior, groundtruth_targets)
+        epoch_metrics = compute_metrics(individuals_posterior=individuals_posterior, groundtruth=groundtruth_targets)
         metrics[epoch + 1] = epoch_metrics
         with open(os.path.join(dump_dir, 'running_metrics.yaml'), 'w') as f:
             yaml.dump({'epoch': metrics}, f)

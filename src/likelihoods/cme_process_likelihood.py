@@ -64,6 +64,7 @@ class CMEProcessLikelihood(GaussianLikelihood):
         buffer = root_inv_extended_bags_covar.t() @ root_inv_extended_bags_covar
         ATA = agg_term @ buffer @ agg_term.t()
         C = ATA.mul(individuals_noise).add_diag(self.noise * torch.ones_like(observations))
+        C = C.add_jitter()
 
         # Compute mean likelihood term (z - A^Tμ)^T C^{-1}(z - A^Tμ)
         mean_term = C.inv_quad(observations - agg_term @ (root_inv_extended_bags_covar.t() @ variational_mean))
