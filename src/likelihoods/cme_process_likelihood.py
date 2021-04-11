@@ -55,7 +55,7 @@ class CMEProcessLikelihood(GaussianLikelihood):
         """
         # Extract variational posterior parameters
         variational_mean = variational_dist.mean
-        variational_root_covar = variational_dist.lazy_covariance_matrix.root_decomposition().root
+        variational_covar_cholesky = variational_dist.lazy_covariance_matrix.cholesky()
 
         # Compute low rank A^T aggregation term, agg_term = l(bags, extended_bags)(L + λNI)^{-1/2}
         agg_term = bags_to_extended_bags_covar @ root_inv_extended_bags_covar
@@ -64,17 +64,16 @@ class CMEProcessLikelihood(GaussianLikelihood):
         buffer = root_inv_extended_bags_covar.t() @ root_inv_extended_bags_covar
         ATA = agg_term @ buffer @ agg_term.t()
         C = ATA.mul(individuals_noise).add_diag(self.noise * torch.ones_like(observations))
-        C = C.add_jitter()
 
         # Compute mean likelihood term (z - A^Tμ)^T C^{-1}(z - A^Tμ)
         mean_term = C.inv_quad(observations - agg_term @ (root_inv_extended_bags_covar.t() @ variational_mean))
 
         # Compute covariance likelihood term tr(Σpost^{1/2}T A C^{-1} A^T Σpost^{1/2})
-        buffer = agg_term @ (root_inv_extended_bags_covar.t() @ variational_root_covar)
+        buffer = agg_term @ (root_inv_extended_bags_covar.t() @ variational_covar_cholesky)
         covar_term, logdetC = C.inv_quad_logdet(buffer.evaluate(), logdet=True)
 
         # Sum up everything to obtain expected logprob under variational distribution
-        constant_term = len(observations) * (np.log(2 * np.pi))
+        constant_term = len(observations) * np.log(2 * np.pi)
         output = -0.5 * (constant_term + logdetC + mean_term + covar_term)
         return output
 
