@@ -11,6 +11,7 @@ EXACT_CME_OUTDIR=experiments/swiss_roll/data/experiment_outputs/seeds/exact_cme_
 EXACT_CME_INDIV_NOISE_OUTDIR=experiments/swiss_roll/data/experiment_outputs/seeds/exact_cme_process_indiv_noise
 VARIATIONAL_CME_OUTDIR=experiments/swiss_roll/data/experiment_outputs/seeds/variational_cme_process
 VARIATIONAL_CME_INDIV_NOISE_OUTDIR=experiments/swiss_roll/data/experiment_outputs/seeds/variational_cme_process_indiv_noise
+RAW_VBAGG_OUTDIR=experiments/swiss_roll/data/experiment_outputs/seeds/vbagg_beta_1
 VBAGG_OUTDIR=experiments/swiss_roll/data/experiment_outputs/seeds/vbagg
 LINEAR_INTERPOLATION_OUTDIR=experiments/swiss_roll/data/experiment_outputs/seeds/linear_interpolation
 
@@ -22,6 +23,7 @@ do
   python experiments/swiss_roll/run_experiment.py --seed=$SEED --cfg=$EXACT_CME_INDIV_NOISE_CFG --o=$EXACT_CME_INDIV_NOISE_OUTDIR/$DIRNAME
   python experiments/swiss_roll/run_experiment.py --seed=$SEED --cfg=$VARIATIONAL_CME_CFG --o=$VARIATIONAL_CME_OUTDIR/$DIRNAME
   python experiments/swiss_roll/run_experiment.py --seed=$SEED --cfg=$VARIATIONAL_CME_INDIV_NOISE_CFG --o=$VARIATIONAL_CME_INDIV_NOISE_OUTDIR/$DIRNAME
+  python experiments/swiss_roll/run_experiment.py --seed=$SEED --cfg=$VBAGG_CFG --o=$RAW_VBAGG_OUTDIR/$DIRNAME --beta=1
   python experiments/swiss_roll/run_experiment.py --seed=$SEED --cfg=$VBAGG_CFG --o=$VBAGG_OUTDIR/$DIRNAME
   python experiments/swiss_roll/run_experiment.py --seed=$SEED --cfg=$LINEAR_INTERPOLATION_CFG --o=$LINEAR_INTERPOLATION_OUTDIR/$DIRNAME
 done

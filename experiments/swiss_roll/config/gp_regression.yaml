@@ -1,18 +1,11 @@
 ################################################################################
-#   CONFIGURATIONS FOR SWISS ROLL EXPERIMENT WITH VBAGG
+#   CONFIGURATIONS FOR SWISS ROLL EXPERIMENT WITH GP REGRESSION
 ################################################################################
-
 
 # MODEL SPECIFICATIONS
 model:
   # Name of model to use
-  name: 'vbagg'
-
-  # Number of inducing points
-  n_inducing_points: 200
-
-  # Random seed for inducing points selection
-  seed: 42
+  name: 'gp_regression'
 
 
 # DATASET
@@ -39,21 +32,16 @@ dataset:
   seed: 42
 
 
-
 # TRAINING
 training:
   # Name of model to use
-  name: 'vbagg'
+  name: 'gp_regression'
 
   # Learning rate
-  lr: 0.005
+  lr: 0.05
 
   # Number of iterations
-  n_epochs: 300
-
-  # Weight of KL term in ELBO
-  beta: 0.1
-
+  n_epochs: 70
 
 
 # EVALUATION

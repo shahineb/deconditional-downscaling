@@ -55,11 +55,7 @@ def build_swiss_roll_variational_cme_process(n_inducing_points, lbda,
                                   bag_kernel=bag_kernel,
                                   inducing_points=inducing_points,
                                   lbda=lbda,
-                                  use_individuals_noise=use_individuals_noise,
-                                  train_individuals=individuals,
-                                  train_bags=bags_values,
-                                  train_aggregate_targets=aggregate_targets,
-                                  bags_sizes=bags_sizes)
+                                  use_individuals_noise=use_individuals_noise)
     return model
 
 

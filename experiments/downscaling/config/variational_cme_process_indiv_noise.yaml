@@ -1,5 +1,5 @@
 ################################################################################
-#   CONFIGURATIONS FOR STATISTICAL DOWNSCALING EXPERIMENT WITH VARIATIONAL CME PROCESS
+#   CONFIGURATIONS FOR STATISTICAL DOWNSCALING EXPERIMENT WITH VARIATIONAL CME PROCESS WITH INDIVIDUALS NOISE
 ################################################################################
 
 
@@ -15,7 +15,7 @@ model:
   n_inducing_points: 1000
 
   # Whether to use noised individuals model or not
-  use_individuals_noise: False
+  use_individuals_noise: True
 
   # Random seed for inducing points selection
   seed: 42
@@ -52,7 +52,7 @@ training:
   name: 'variational_cme_process'
 
   # Whether to use noised individuals model or not
-  use_individuals_noise: False
+  use_individuals_noise: True
 
   # Learning rate
   lr: 0.001

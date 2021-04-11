@@ -1,21 +1,15 @@
 ################################################################################
-#   CONFIGURATIONS FOR STATISTICAL DOWNSCALING EXPERIMENT WITH VARIATIONAL CME PROCESS
+#   CONFIGURATIONS FOR STATISTICAL DOWNSCALING EXPERIMENT WITH VBAGG
 ################################################################################
 
 
 # MODEL SPECIFICATIONS
 model:
   # Name of model to use
-  name: 'variational_cme_process'
-
-  # CME regularization parameter
-  lbda: 0.001
+  name: 'vbagg'
 
   # Number of inducing points
   n_inducing_points: 1000
-
-  # Whether to use noised individuals model or not
-  use_individuals_noise: False
 
   # Random seed for inducing points selection
   seed: 42
@@ -49,10 +43,7 @@ dataset:
 # TRAINING
 training:
   # Name of model to use
-  name: 'variational_cme_process'
-
-  # Whether to use noised individuals model or not
-  use_individuals_noise: False
+  name: 'vbagg'
 
   # Learning rate
   lr: 0.001
