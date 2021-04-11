@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=swiss_roll_experiment
+#SBATCH --job-name=seedroll
 #SBATCH --partition=ziz-gpu
 #SBATCH --gres=gpu:1
 #SBATCH --time=14-00:00:00
