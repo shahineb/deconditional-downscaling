@@ -35,7 +35,7 @@ def build_swiss_roll_gp_regressor(bags_values, aggregate_targets, **kwargs):
                     covar_module=covar_module,
                     train_x=bags_values,
                     train_y=aggregate_targets,
-                    likelihood=gpytorch.likelihood.GaussianLikelihood())
+                    likelihood=gpytorch.likelihoods.GaussianLikelihood())
     return model
 
 

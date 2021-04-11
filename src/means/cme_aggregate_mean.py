@@ -19,7 +19,7 @@ class CMEAggregateMean(means.Mean):
         self.bag_kernel = bag_kernel
         self.individuals_mean = individuals_mean
         self.register_buffer('bags_values', bags_values)
-        self.register_buffer('root_inv_bags_covar', root_inv_bags_covar)
+        self.root_inv_bags_covar = root_inv_bags_covar
 
     def forward(self, x):
         """Compute CME aggregate mean
@@ -53,3 +53,8 @@ class CMEAggregateMean(means.Mean):
         bar = self.root_inv_bags_covar.t().matmul(self.individuals_mean)
         output = foo.matmul(bar)
         return output
+
+    def to(self, *args, **kwargs):
+        super().to(*args, **kwargs)
+        self.root_inv_bags_covar.to(*args, **kwargs)
+        return self
