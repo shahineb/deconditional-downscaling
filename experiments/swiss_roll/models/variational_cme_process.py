@@ -138,7 +138,7 @@ def train_swiss_roll_variational_cme_process(model, individuals, bags_values, ag
         k_lengthscales = model.individuals_kernel.base_kernel.lengthscale.detach()[0].tolist()
         l_lengthscales = model.bag_kernel.base_kernel.lengthscale.detach()[0].tolist()
         epoch_metrics.update({'nll': nll.item(),
-                              'aggregate_noise': model.likelihood.noise.detach().item(),
+                              'aggregate_noise': likelihood.noise.detach().item(),
                               'indiv_noise': model.noise_kernel.outputscale.detach().item(),
                               'k_outputscale': model.individuals_kernel.outputscale.detach().item(),
                               'k_lengthscale_x': k_lengthscales[0],
