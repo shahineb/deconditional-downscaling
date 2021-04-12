@@ -5,7 +5,7 @@ import gpytorch
 from sklearn.cluster import KMeans
 from progress.bar import Bar
 from models import VariationalCMEProcess, CMEProcessLikelihood, MODELS, TRAINERS, PREDICTERS
-from core.metrics import compute_metrics
+from core.metrics import compute_metrics, compute_subsampled_nll
 
 
 @MODELS.register('variational_cme_process')
@@ -131,6 +131,25 @@ def train_swiss_roll_variational_cme_process(model, individuals, bags_values, ag
         individuals_posterior = predict_swiss_roll_variational_cme_process(model=model,
                                                                            individuals=groundtruth_individuals)
         epoch_metrics = compute_metrics(individuals_posterior=individuals_posterior, groundtruth=groundtruth_targets)
+
+        ############
+        nll = compute_subsampled_nll(X_gt=groundtruth_individuals, t_gt=groundtruth_targets, seed=42,
+                                     n_individuals=2000, model=model, predict=predict_swiss_roll_variational_cme_process)
+        k_lengthscales = model.individuals_kernel.base_kernel.lengthscale.detach()[0].tolist()
+        l_lengthscales = model.bag_kernel.base_kernel.lengthscale.detach()[0].tolist()
+        epoch_metrics.update({'nll': nll.item(),
+                              'aggregate_noise': model.likelihood.noise.detach().item(),
+                              'indiv_noise': model.noise_kernel.outputscale.detach().item(),
+                              'k_outputscale': model.individuals_kernel.outputscale.detach().item(),
+                              'k_lengthscale_x': k_lengthscales[0],
+                              'k_lengthscale_y': k_lengthscales[1],
+                              'k_lengthscale_z': k_lengthscales[2],
+                              'l_outputscale': model.bag_kernel.outputscale.detach().item(),
+                              'l_lengthscale_x': l_lengthscales[0],
+                              'l_lengthscale_y': l_lengthscales[1],
+                              'l_lengthscale_z': l_lengthscales[2]})
+        ###########
+
         metrics[epoch + 1] = epoch_metrics
         with open(os.path.join(dump_dir, 'running_metrics.yaml'), 'w') as f:
             yaml.dump({'epoch': metrics}, f)
