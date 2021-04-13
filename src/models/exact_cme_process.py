@@ -58,6 +58,9 @@ class ExactCMEProcess(ExactGP, CMEProcess):
         # Initialize individuals posterior prediction strategy attribute
         self.individuals_prediction_strategy = None
 
+    def _clear_cache(self):
+        self.individuals_prediction_strategy = None
+
     def setup_individuals_prediction_strategy(self):
         """Defines computational strategy for deriving predictive posterior on individuals
         """

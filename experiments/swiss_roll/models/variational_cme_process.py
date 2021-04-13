@@ -60,8 +60,9 @@ def build_swiss_roll_variational_cme_process(n_inducing_points, lbda,
 
 
 @TRAINERS.register('variational_cme_process')
-def train_swiss_roll_variational_cme_process(model, individuals, bags_values, aggregate_targets, bags_sizes, use_individuals_noise,
-                                             groundtruth_individuals, groundtruth_targets, lr, n_epochs, beta, dump_dir, **kwargs):
+def train_swiss_roll_variational_cme_process(model, individuals, bags_values, aggregate_targets, bags_sizes,
+                                             use_individuals_noise, lr, n_epochs, beta,
+                                             groundtruth_individuals, groundtruth_targets, chunk_size, dump_dir, **kwargs):
     """Hard-coded training script of Variational CME Process for swiss roll experiment
 
     Args:
@@ -127,29 +128,12 @@ def train_swiss_roll_variational_cme_process(model, individuals, bags_values, ag
         bar.suffix = f"ELBO {-loss.item()}"
         bar.next()
 
-        # Compute posterior distribution at current epoch and store metrics
-        individuals_posterior = predict_swiss_roll_variational_cme_process(model=model,
-                                                                           individuals=groundtruth_individuals)
-        epoch_metrics = compute_metrics(individuals_posterior=individuals_posterior, groundtruth=groundtruth_targets)
-
-        ############
-        nll = compute_chunked_nll(X_gt=groundtruth_individuals, t_gt=groundtruth_targets,
-                                  chunk_size=2000, model=model, predict=predict_swiss_roll_variational_cme_process)
-        k_lengthscales = model.individuals_kernel.base_kernel.lengthscale.detach()[0].tolist()
-        l_lengthscales = model.bag_kernel.base_kernel.lengthscale.detach()[0].tolist()
-        epoch_metrics.update({'nll': float(nll),
-                              'aggregate_noise': likelihood.noise.detach().item(),
-                              'indiv_noise': model.noise_kernel.outputscale.detach().item(),
-                              'k_outputscale': model.individuals_kernel.outputscale.detach().item(),
-                              'k_lengthscale_x': k_lengthscales[0],
-                              'k_lengthscale_y': k_lengthscales[1],
-                              'k_lengthscale_z': k_lengthscales[2],
-                              'l_outputscale': model.bag_kernel.outputscale.detach().item(),
-                              'l_lengthscale_x': l_lengthscales[0],
-                              'l_lengthscale_y': l_lengthscales[1],
-                              'l_lengthscale_z': l_lengthscales[2]})
-        ###########
-
+        # Compute epoch metrics and dump
+        epoch_metrics = compute_epoch_metrics(model=model,
+                                              likelihood=likelihood,
+                                              groundtruth_individuals=groundtruth_individuals,
+                                              groundtruth_targets=groundtruth_targets,
+                                              chunk_size=chunk_size)
         metrics[epoch + 1] = epoch_metrics
         with open(os.path.join(dump_dir, 'running_metrics.yaml'), 'w') as f:
             yaml.dump({'epoch': metrics}, f)
@@ -161,26 +145,55 @@ def train_swiss_roll_variational_cme_process(model, individuals, bags_values, ag
     torch.save(state, os.path.join(dump_dir, 'state.pt'))
 
 
+def compute_epoch_metrics(model, likelihood, groundtruth_individuals, groundtruth_targets, chunk_size):
+    # Set model in evaluation mode
+    model.eval()
+
+    # Compute individuals posterior on groundtruth distorted swiss roll
+    individuals_posterior = predict_swiss_roll_variational_cme_process(model=model,
+                                                                       individuals=groundtruth_individuals)
+    # Compute MSE, MAE, MB
+    epoch_metrics = compute_metrics(individuals_posterior=individuals_posterior, groundtruth_targets=groundtruth_targets)
+
+    # Compute chunked approximation of NLL
+    nll = compute_chunked_nll(groundtruth_individuals=groundtruth_individuals, groundtruth_targets=groundtruth_targets,
+                              chunk_size=chunk_size, model=model, predict=predict_swiss_roll_variational_cme_process)
+    epoch_metrics.update({'nll': nll})
+
+    # Record model hyperparameters
+    k_lengthscales = model.individuals_kernel.base_kernel.lengthscale.detach()[0].tolist()
+    l_lengthscales = model.bag_kernel.base_kernel.lengthscale.detach()[0].tolist()
+    epoch_metrics.update({'aggregate_noise': likelihood.noise.detach().item(),
+                          'k_outputscale': model.individuals_kernel.outputscale.detach().item(),
+                          'k_lengthscale_x': k_lengthscales[0],
+                          'k_lengthscale_y': k_lengthscales[1],
+                          'k_lengthscale_z': k_lengthscales[2],
+                          'l_outputscale': model.bag_kernel.outputscale.detach().item(),
+                          'l_lengthscale_x': l_lengthscales[0],
+                          'l_lengthscale_y': l_lengthscales[1],
+                          'l_lengthscale_z': l_lengthscales[2]})
+    if model.noise_kernel:
+        epoch_metrics.update({'indiv_noise': model.noise_kernel.outputscale.detach().item()})
+
+    # Set model in train mode
+    model.train()
+    return epoch_metrics
+
+
 @PREDICTERS.register('variational_cme_process')
 def predict_swiss_roll_variational_cme_process(model, individuals, **kwargs):
     """Hard-coded prediciton of individuals posterior for Variational CME Process on
     swiss roll experiment
 
     Args:
-        model (VariationalCMEProcess)
+        model (VariationalCMEProcess): in evaluation mode
         individuals (torch.Tensor)
 
     Returns:
         type: gpytorch.distributions.MultivariateNormal
 
     """
-    # Set model in evaluation mode
-    model.eval()
-
     # Compute predictive posterior on individuals
     with torch.no_grad():
         individuals_posterior = model(individuals)
-
-    # Set back to training mode
-    model.train()
     return individuals_posterior

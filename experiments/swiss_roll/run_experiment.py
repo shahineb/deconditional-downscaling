@@ -24,12 +24,9 @@ import os
 import yaml
 import logging
 from docopt import docopt
-import torch
-import gpytorch
 import matplotlib.pyplot as plt
 import core.generation as gen
 import core.visualization as vis
-from core.metrics import compute_metrics
 from models import build_model, train_model, predict
 
 
@@ -66,33 +63,26 @@ def main(args, cfg):
                            bags_sizes=bags_sizes,
                            groundtruth_individuals=X_gt,
                            groundtruth_targets=t_gt,
+                           chunk_size=cfg['evaluation']['chunk_size_nll'],
                            dump_dir=args['--o'])
     train_model(cfg['training'])
 
-    # Compute individuals predictive posterior and plot prediction
-    logging.info("Predicting individuals posterior\n")
-    predict_kwargs = {'name': cfg['model']['name'],
-                      'model': model.cpu(),
-                      'individuals': X_gt.cpu()}
-    individuals_posterior = predict(predict_kwargs)
-
     # Save prediction scatter plot
     if args['--plot']:
+        # Compute individuals poserior on groundtruth distorted swiss roll
+        logging.info("Plotting individuals posterior\n")
+        predict_kwargs = {'name': cfg['model']['name'],
+                          'model': model.eval().cpu(),
+                          'individuals': X_gt}
+        individuals_posterior = predict(predict_kwargs)
+
+        # Dump scatter plot
         dump_plot(plotting_function=vis.plot_grountruth_prediction,
                   filename='prediction.png',
                   output_dir=args['--o'],
                   individuals_posterior=individuals_posterior,
                   groundtruth_individuals=X_gt,
                   targets=t_gt)
-
-    # Evaluate mean metrics
-    logging.info("Evaluating model\n")
-    evaluate_model(cfg=cfg,
-                   model=model,
-                   individuals_posterior=individuals_posterior,
-                   X_gt=X_gt,
-                   t_gt=t_gt,
-                   output_dir=args['--o'])
 
 
 def make_dataset(cfg):
@@ -151,36 +141,6 @@ def dump_plot(plotting_function, filename, output_dir, *plot_args, **plot_kwargs
     plt.savefig(dump_path)
     plt.close()
     logging.info(f"Plot saved at {dump_path}\n")
-
-
-def evaluate_model(cfg, model, individuals_posterior, X_gt, t_gt, output_dir):
-    """Computes average NLL and MSE on individuals and dumps into YAML file
-    """
-    # Compute mean square error on individuals posterior
-    individuals_metrics = compute_metrics(individuals_posterior, t_gt)
-
-    # Select subset of individuals for NLL computation - scalability
-    torch.random.manual_seed(cfg['evaluation']['seed'])
-    rdm_idx = torch.randperm(X_gt.size(0))
-    n_individuals = cfg['evaluation']['n_samples_nll']
-    sub_individuals = X_gt[rdm_idx][:n_individuals]
-    sub_individuals_target = t_gt[rdm_idx][:n_individuals]
-
-    # Compute model NLL on subset
-    predict_kwargs = {'name': cfg['model']['name'],
-                      'model': model,
-                      'individuals': sub_individuals}
-    with gpytorch.settings.fast_computations(log_prob=False, covar_root_decomposition=False):
-        sub_individuals_posterior = predict(predict_kwargs)
-        with torch.no_grad():
-            nll = -sub_individuals_posterior.log_prob(sub_individuals_target).div(n_individuals)
-
-    # Record and dump as YAML file
-    individuals_metrics.update(nll=nll.item())
-    dump_path = os.path.join(output_dir, 'metrics.yaml')
-    with open(dump_path, 'w') as f:
-        yaml.dump(individuals_metrics, f)
-    logging.info(f"Metrics : {individuals_metrics}\n")
 
 
 def update_cfg(cfg, args):

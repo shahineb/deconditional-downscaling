@@ -1,8 +1,10 @@
 import os
+import yaml
 import torch
 import gpytorch
 from progress.bar import Bar
 from models import ExactCMEProcess, MODELS, TRAINERS, PREDICTERS
+from core.metrics import compute_metrics, compute_chunked_nll
 
 
 @MODELS.register('exact_cme_process')
@@ -52,8 +54,9 @@ def build_swiss_roll_exact_cme_process(individuals, bags_values, aggregate_targe
 
 
 @TRAINERS.register('exact_cme_process')
-def train_swiss_roll_exact_cme_process(model, lr, n_epochs, groundtruth_individuals,
-                                       groundtruth_targets, dump_dir, **kwargs):
+def train_swiss_roll_exact_cme_process(model, lr, n_epochs,
+                                       groundtruth_individuals, groundtruth_targets,
+                                       chunk_size, dump_dir, **kwargs):
     """Hard-coded training script of Exact CME Process for swiss roll experiment
 
     Args:
@@ -77,7 +80,10 @@ def train_swiss_roll_exact_cme_process(model, lr, n_epochs, groundtruth_individu
     # Initialize progress bar
     bar = Bar("Epoch", max=n_epochs)
 
-    for _ in range(n_epochs):
+    # Metrics record
+    metrics = dict()
+
+    for epoch in range(n_epochs):
         # Zero-out remaining gradients
         optimizer.zero_grad()
 
@@ -94,14 +100,56 @@ def train_swiss_roll_exact_cme_process(model, lr, n_epochs, groundtruth_individu
         # Update aggregation operators based on new hyperparameters
         model.update_cme_estimate_parameters()
 
+        # Update progress bar
         bar.suffix = f"NLL {loss.item()}"
         bar.next()
+
+        # Compute epoch metrics and dump
+        epoch_metrics = compute_epoch_metrics(model=model,
+                                              groundtruth_individuals=groundtruth_individuals,
+                                              groundtruth_targets=groundtruth_targets,
+                                              chunk_size=chunk_size)
+        metrics[epoch + 1] = epoch_metrics
+        with open(os.path.join(dump_dir, 'running_metrics.yaml'), 'w') as f:
+            yaml.dump({'epoch': metrics}, f)
 
     # Save model training state
     state = {'epoch': n_epochs,
              'state_dict': model.state_dict(),
              'optimizer': optimizer.state_dict()}
     torch.save(state, os.path.join(dump_dir, 'state.pt'))
+
+
+def compute_epoch_metrics(model, groundtruth_individuals, groundtruth_targets, chunk_size):
+    # Compute individuals posterior on groundtruth distorted swiss roll
+    individuals_posterior = predict_swiss_roll_exact_cme_process(model=model,
+                                                                 individuals=groundtruth_individuals)
+    # Compute MSE, MAE, MB
+    epoch_metrics = compute_metrics(individuals_posterior=individuals_posterior, groundtruth_targets=groundtruth_targets)
+
+    # Compute chunked approximation of NLL
+    nll = compute_chunked_nll(groundtruth_individuals=groundtruth_individuals, groundtruth_targets=groundtruth_targets,
+                              chunk_size=chunk_size, model=model, predict=predict_swiss_roll_exact_cme_process)
+    epoch_metrics.update({'nll': nll})
+
+    # Record model hyperparameters
+    k_lengthscales = model.individuals_kernel.base_kernel.lengthscale.detach()[0].tolist()
+    l_lengthscales = model.bag_kernel.base_kernel.lengthscale.detach()[0].tolist()
+    epoch_metrics.update({'aggregate_noise': model.likelihood.noise.detach().item(),
+                          'k_outputscale': model.individuals_kernel.outputscale.detach().item(),
+                          'k_lengthscale_x': k_lengthscales[0],
+                          'k_lengthscale_y': k_lengthscales[1],
+                          'k_lengthscale_z': k_lengthscales[2],
+                          'l_outputscale': model.bag_kernel.outputscale.detach().item(),
+                          'l_lengthscale_x': l_lengthscales[0],
+                          'l_lengthscale_y': l_lengthscales[1],
+                          'l_lengthscale_z': l_lengthscales[2]})
+    if model.noise_kernel:
+        epoch_metrics.update({'indiv_noise': model.noise_kernel.outputscale.detach().item()})
+
+    # Clear model cache from prediction strategy
+    model._clear_cache()
+    return epoch_metrics
 
 
 @PREDICTERS.register('exact_cme_process')
@@ -117,13 +165,7 @@ def predict_swiss_roll_exact_cme_process(model, individuals, **kwargs):
         type: gpytorch.distributions.MultivariateNormal
 
     """
-    # Set model in evaluation mode
-    model.eval()
-
     # Compute predictive posterior on individuals
     with torch.no_grad():
         individuals_posterior = model.predict(individuals)
-
-    # Set back to training mode
-    model.train()
     return individuals_posterior

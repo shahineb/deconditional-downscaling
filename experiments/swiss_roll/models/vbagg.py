@@ -5,7 +5,7 @@ import gpytorch
 from sklearn.cluster import KMeans
 from progress.bar import Bar
 from models import VariationalGP, VBaggGaussianLikelihood, MODELS, TRAINERS, PREDICTERS
-from core.metrics import compute_metrics
+from core.metrics import compute_metrics, compute_chunked_nll
 
 
 @MODELS.register('vbagg')
@@ -46,7 +46,8 @@ def build_swiss_roll_vbagg_model(individuals, n_inducing_points, seed, **kwargs)
 
 @TRAINERS.register('vbagg')
 def train_swiss_roll_vbagg_model(model, individuals, aggregate_targets, bags_sizes,
-                                 groundtruth_individuals, groundtruth_targets, lr, n_epochs, beta, dump_dir, **kwargs):
+                                 groundtruth_individuals, groundtruth_targets, chunk_size,
+                                 lr, n_epochs, beta, dump_dir, **kwargs):
     """Hard-coded training script of Vbagg model for swiss roll experiment
 
     Args:
@@ -100,13 +101,16 @@ def train_swiss_roll_vbagg_model(model, individuals, aggregate_targets, bags_siz
         loss.backward()
         optimizer.step()
 
+        # Update progress bar
         bar.suffix = f"ELBO {-loss.item()}"
         bar.next()
 
-        # Compute posterior distribution at current epoch and store metrics
-        individuals_posterior = predict_swiss_roll_vbagg_model(model=model,
-                                                               individuals=groundtruth_individuals)
-        epoch_metrics = compute_metrics(individuals_posterior=individuals_posterior, groundtruth=groundtruth_targets)
+        # Compute epoch metrics and dump
+        epoch_metrics = compute_epoch_metrics(model=model,
+                                              likelihood=likelihood,
+                                              groundtruth_individuals=groundtruth_individuals,
+                                              groundtruth_targets=groundtruth_targets,
+                                              chunk_size=chunk_size)
         metrics[epoch + 1] = epoch_metrics
         with open(os.path.join(dump_dir, 'running_metrics.yaml'), 'w') as f:
             yaml.dump({'epoch': metrics}, f)
@@ -118,26 +122,48 @@ def train_swiss_roll_vbagg_model(model, individuals, aggregate_targets, bags_siz
     torch.save(state, os.path.join(dump_dir, 'state.pt'))
 
 
+def compute_epoch_metrics(model, likelihood, groundtruth_individuals, groundtruth_targets, chunk_size):
+    # Set model in evaluation mode
+    model.eval()
+
+    # Compute individuals posterior on groundtruth distorted swiss roll
+    individuals_posterior = predict_swiss_roll_vbagg_model(model=model,
+                                                           individuals=groundtruth_individuals)
+    # Compute MSE, MAE, MB
+    epoch_metrics = compute_metrics(individuals_posterior=individuals_posterior, groundtruth_targets=groundtruth_targets)
+
+    # Compute chunked approximation of NLL
+    nll = compute_chunked_nll(groundtruth_individuals=groundtruth_individuals, groundtruth_targets=groundtruth_targets,
+                              chunk_size=chunk_size, model=model, predict=predict_swiss_roll_vbagg_model)
+    epoch_metrics.update({'nll': nll})
+
+    # Record model hyperparameters
+    k_lengthscales = model.covar_module.base_kernel.lengthscale.detach()[0].tolist()
+    epoch_metrics.update({'aggregate_noise': likelihood.noise.detach().item(),
+                          'k_outputscale': model.covar_module.outputscale.detach().item(),
+                          'k_lengthscale_x': k_lengthscales[0],
+                          'k_lengthscale_y': k_lengthscales[1],
+                          'k_lengthscale_z': k_lengthscales[2]})
+
+    # Set model in train mode
+    model.train()
+    return epoch_metrics
+
+
 @PREDICTERS.register('vbagg')
 def predict_swiss_roll_vbagg_model(model, individuals, **kwargs):
     """Hard-coded prediciton of individuals posterior for vbagg model on
     swiss roll experiment
 
     Args:
-        model (VariationalGP)
+        model (VariationalGP): in evaluation mode
         individuals (torch.Tensor)
 
     Returns:
         type: gpytorch.distributions.MultivariateNormal
 
     """
-    # Set model in evaluation mode
-    model.eval()
-
     # Compute predictive posterior on individuals
     with torch.no_grad():
         individuals_posterior = model(individuals)
-
-    # Set back to trainind mode
-    model.train()
     return individuals_posterior

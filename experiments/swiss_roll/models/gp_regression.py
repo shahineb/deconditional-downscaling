@@ -4,7 +4,7 @@ import torch
 import gpytorch
 from progress.bar import Bar
 from models import ExactGP, MODELS, TRAINERS, PREDICTERS
-from core.metrics import compute_metrics
+from core.metrics import compute_metrics, compute_chunked_nll
 
 
 @MODELS.register('gp_regression')
@@ -40,8 +40,9 @@ def build_swiss_roll_gp_regressor(bags_values, aggregate_targets, **kwargs):
 
 
 @TRAINERS.register('gp_regression')
-def train_swiss_roll_gp_regressor(model, bags_values, aggregate_targets, lr, n_epochs, groundtruth_individuals,
-                                  groundtruth_targets, dump_dir, **kwargs):
+def train_swiss_roll_gp_regressor(model, bags_values, aggregate_targets, lr, n_epochs,
+                                  groundtruth_individuals, groundtruth_targets,
+                                  chunk_size, dump_dir, **kwargs):
     """Hard-coded training script of Exact GP for swiss roll experiment
 
     Args:
@@ -92,8 +93,10 @@ def train_swiss_roll_gp_regressor(model, bags_values, aggregate_targets, lr, n_e
         bar.next()
 
         # Compute posterior distribution at current epoch and store metrics
-        individuals_posterior = predict_swiss_roll_gp_regressor(model=model, individuals=groundtruth_individuals)
-        epoch_metrics = compute_metrics(individuals_posterior=individuals_posterior, groundtruth=groundtruth_targets)
+        epoch_metrics = compute_epoch_metrics(model=model,
+                                              groundtruth_individuals=groundtruth_individuals,
+                                              groundtruth_targets=groundtruth_targets,
+                                              chunk_size=chunk_size)
         metrics[epoch + 1] = epoch_metrics
         with open(os.path.join(dump_dir, 'running_metrics.yaml'), 'w') as f:
             yaml.dump({'epoch': metrics}, f)
@@ -105,26 +108,51 @@ def train_swiss_roll_gp_regressor(model, bags_values, aggregate_targets, lr, n_e
     torch.save(state, os.path.join(dump_dir, 'state.pt'))
 
 
+def compute_epoch_metrics(model, groundtruth_individuals, groundtruth_targets, chunk_size):
+    # Set model in evaluation mode
+    model.eval()
+
+    # Compute individuals posterior on groundtruth distorted swiss roll
+    individuals_posterior = predict_swiss_roll_gp_regressor(model=model,
+                                                            individuals=groundtruth_individuals)
+    # Compute MSE, MAE, MB
+    epoch_metrics = compute_metrics(individuals_posterior=individuals_posterior, groundtruth_targets=groundtruth_targets)
+
+    # Compute chunked approximation of NLL
+    nll = compute_chunked_nll(groundtruth_individuals=groundtruth_individuals, groundtruth_targets=groundtruth_targets,
+                              chunk_size=chunk_size, model=model, predict=predict_swiss_roll_gp_regressor)
+    epoch_metrics.update({'nll': nll})
+
+    # Record model hyperparameters
+    lengthscales = model.covar_module.base_kernel.lengthscale.detach()[0].tolist()
+    epoch_metrics.update({'aggregate_noise': model.likelihood.noise.detach().item(),
+                          'outputscale': model.covar_module.outputscale.detach().item(),
+                          'lengthscale_x': lengthscales[0],
+                          'lengthscale_y': lengthscales[1],
+                          'lengthscale_z': lengthscales[2]})
+
+    # Clear model cache from prediction strategy
+    model._clear_cache()
+
+    # Set model in train mode
+    model.train()
+    return epoch_metrics
+
+
 @PREDICTERS.register('gp_regression')
 def predict_swiss_roll_gp_regressor(model, individuals, **kwargs):
     """Hard-coded prediciton of individuals posterior for ExactGP on
     swiss roll experiment
 
     Args:
-        model (ExactGP)
+        model (ExactGP): in evaluation mode
         individuals (torch.Tensor)
 
     Returns:
         type: gpytorch.distributions.MultivariateNormal
 
     """
-    # Set model in evaluation mode
-    model.eval()
-
     # Compute predictive posterior on individuals
     with torch.no_grad():
         individuals_posterior = model(individuals)
-
-    # Set back to training mode
-    model.train()
     return individuals_posterior
