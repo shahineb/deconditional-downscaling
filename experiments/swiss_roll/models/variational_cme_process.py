@@ -5,7 +5,7 @@ import gpytorch
 from sklearn.cluster import KMeans
 from progress.bar import Bar
 from models import VariationalCMEProcess, CMEProcessLikelihood, MODELS, TRAINERS, PREDICTERS
-from core.metrics import compute_metrics, compute_subsampled_nll
+from core.metrics import compute_metrics, compute_chunked_nll
 
 
 @MODELS.register('variational_cme_process')
@@ -133,11 +133,11 @@ def train_swiss_roll_variational_cme_process(model, individuals, bags_values, ag
         epoch_metrics = compute_metrics(individuals_posterior=individuals_posterior, groundtruth=groundtruth_targets)
 
         ############
-        nll = compute_subsampled_nll(X_gt=groundtruth_individuals, t_gt=groundtruth_targets, seed=42,
-                                     n_individuals=2000, model=model, predict=predict_swiss_roll_variational_cme_process)
+        nll = compute_chunked_nll(X_gt=groundtruth_individuals, t_gt=groundtruth_targets,
+                                  chunk_size=2000, model=model, predict=predict_swiss_roll_variational_cme_process)
         k_lengthscales = model.individuals_kernel.base_kernel.lengthscale.detach()[0].tolist()
         l_lengthscales = model.bag_kernel.base_kernel.lengthscale.detach()[0].tolist()
-        epoch_metrics.update({'nll': nll.item(),
+        epoch_metrics.update({'nll': float(nll),
                               'aggregate_noise': likelihood.noise.detach().item(),
                               'indiv_noise': model.noise_kernel.outputscale.detach().item(),
                               'k_outputscale': model.individuals_kernel.outputscale.detach().item(),
