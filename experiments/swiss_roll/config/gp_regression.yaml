@@ -26,7 +26,7 @@ dataset:
   individuals_noise_variance: 0.05
 
   # Variance of noise to apply on aggregate targets
-  aggregate_noise_variance: 0.50
+  aggregate_noise_variance: 0.05
 
   # Random seed for dataset generation
   seed: 42

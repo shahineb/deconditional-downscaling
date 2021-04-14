@@ -68,6 +68,8 @@ def train_swiss_roll_exact_cme_process(model, lr, n_epochs,
     # Move to device
     device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
     model = model.to(device)
+    groundtruth_individuals = groundtruth_individuals.to(device)
+    groundtruth_targets = groundtruth_targets.to(device)
 
     # Set model in training mode
     model.train()
