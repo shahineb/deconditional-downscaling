@@ -51,7 +51,7 @@ training:
   n_epochs: 200
 
   # Batch size
-  batch_size: 16
+  batch_size: 47
 
   # Weight of KL term in ELBO
   beta: 0.001
@@ -62,5 +62,3 @@ training:
 
 # EVALUATION
 evaluation:
-  # Step size used to extract grid blocks for inference - to be removed once RFF inference implemented
-  step_size: 10

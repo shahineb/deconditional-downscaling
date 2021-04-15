@@ -10,8 +10,7 @@ from core.metrics import compute_metrics, compute_chunked_nll
 
 @MODELS.register('variational_cme_process')
 def build_swiss_roll_variational_cme_process(n_inducing_points, lbda,
-                                             individuals, bags_values, aggregate_targets,
-                                             bags_sizes, use_individuals_noise, seed, **kwargs):
+                                             individuals, use_individuals_noise, seed, **kwargs):
     """Hard-coded initialization of Variational CME Process module used for swiss roll experiment
 
     Args:
@@ -101,8 +100,8 @@ def train_swiss_roll_variational_cme_process(model, individuals, bags_values, ag
     # Initialize progress bar
     bar = Bar("Epoch", max=n_epochs)
 
-    # Metrics record
-    metrics = dict()
+    # Logs record
+    logs = dict()
 
     for epoch in range(n_epochs):
         # Zero-out remaining gradients
@@ -128,15 +127,14 @@ def train_swiss_roll_variational_cme_process(model, individuals, bags_values, ag
         bar.suffix = f"ELBO {-loss.item()}"
         bar.next()
 
-        # Compute epoch metrics and dump
-        epoch_metrics = compute_epoch_metrics(model=model,
-                                              likelihood=likelihood,
-                                              groundtruth_individuals=groundtruth_individuals,
-                                              groundtruth_targets=groundtruth_targets,
-                                              chunk_size=chunk_size)
-        metrics[epoch + 1] = epoch_metrics
-        with open(os.path.join(dump_dir, 'running_metrics.yaml'), 'w') as f:
-            yaml.dump({'epoch': metrics}, f)
+        # Compute epoch logs and dump
+        epoch_logs = get_epoch_logs(model=model,
+                                    groundtruth_individuals=groundtruth_individuals,
+                                    groundtruth_targets=groundtruth_targets,
+                                    chunk_size=chunk_size)
+        logs[epoch + 1] = epoch_logs
+        with open(os.path.join(dump_dir, 'running_logs.yaml'), 'w') as f:
+            yaml.dump({'epoch': logs}, f)
 
     # Save model training state
     state = {'epoch': n_epochs,
@@ -145,7 +143,7 @@ def train_swiss_roll_variational_cme_process(model, individuals, bags_values, ag
     torch.save(state, os.path.join(dump_dir, 'state.pt'))
 
 
-def compute_epoch_metrics(model, likelihood, groundtruth_individuals, groundtruth_targets, chunk_size):
+def get_epoch_logs(model, likelihood, groundtruth_individuals, groundtruth_targets, chunk_size):
     # Set model in evaluation mode
     model.eval()
 
@@ -153,31 +151,31 @@ def compute_epoch_metrics(model, likelihood, groundtruth_individuals, groundtrut
     individuals_posterior = predict_swiss_roll_variational_cme_process(model=model,
                                                                        individuals=groundtruth_individuals)
     # Compute MSE, MAE, MB
-    epoch_metrics = compute_metrics(individuals_posterior=individuals_posterior, groundtruth_targets=groundtruth_targets)
+    epoch_logs = compute_metrics(individuals_posterior=individuals_posterior, groundtruth_targets=groundtruth_targets)
 
     # Compute chunked approximation of NLL
     nll = compute_chunked_nll(groundtruth_individuals=groundtruth_individuals, groundtruth_targets=groundtruth_targets,
                               chunk_size=chunk_size, model=model, predict=predict_swiss_roll_variational_cme_process)
-    epoch_metrics.update({'nll': nll})
+    epoch_logs.update({'nll': nll})
 
     # Record model hyperparameters
     k_lengthscales = model.individuals_kernel.base_kernel.lengthscale.detach()[0].tolist()
     l_lengthscales = model.bag_kernel.base_kernel.lengthscale.detach()[0].tolist()
-    epoch_metrics.update({'aggregate_noise': likelihood.noise.detach().item(),
-                          'k_outputscale': model.individuals_kernel.outputscale.detach().item(),
-                          'k_lengthscale_x': k_lengthscales[0],
-                          'k_lengthscale_y': k_lengthscales[1],
-                          'k_lengthscale_z': k_lengthscales[2],
-                          'l_outputscale': model.bag_kernel.outputscale.detach().item(),
-                          'l_lengthscale_x': l_lengthscales[0],
-                          'l_lengthscale_y': l_lengthscales[1],
-                          'l_lengthscale_z': l_lengthscales[2]})
+    epoch_logs.update({'aggregate_noise': likelihood.noise.detach().item(),
+                       'k_outputscale': model.individuals_kernel.outputscale.detach().item(),
+                       'k_lengthscale_x': k_lengthscales[0],
+                       'k_lengthscale_y': k_lengthscales[1],
+                       'k_lengthscale_z': k_lengthscales[2],
+                       'l_outputscale': model.bag_kernel.outputscale.detach().item(),
+                       'l_lengthscale_x': l_lengthscales[0],
+                       'l_lengthscale_y': l_lengthscales[1],
+                       'l_lengthscale_z': l_lengthscales[2]})
     if model.noise_kernel:
-        epoch_metrics.update({'indiv_noise': model.noise_kernel.outputscale.detach().item()})
+        epoch_logs.update({'indiv_noise': model.noise_kernel.outputscale.detach().item()})
 
     # Set model in train mode
     model.train()
-    return epoch_metrics
+    return epoch_logs
 
 
 @PREDICTERS.register('variational_cme_process')

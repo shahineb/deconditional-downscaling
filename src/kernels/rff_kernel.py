@@ -51,7 +51,7 @@ class RFFKernel(kernels.RFFKernel):
         if rand_weights is None:
             rand_shape = torch.Size([*self._batch_shape, d, D])
             rand_weights = self.base_distribution.sample(sample_shape=rand_shape).to(dtype=self.raw_lengthscale.dtype, device=self.raw_lengthscale.device)
-        self.register_buffer("rand_weights", rand_weights)
+        self.register_buffer("rand_weights", rand_weights.squeeze().t())
 
     def _featurize(self, x, normalize=False):
         # Recompute division each time to allow backprop through lengthscale
@@ -59,8 +59,7 @@ class RFFKernel(kernels.RFFKernel):
         x = x.matmul(self.rand_weights / self.lengthscale.transpose(-1, -2))
         z = torch.cat([torch.cos(x), torch.sin(x)], dim=-1)
         if normalize:
-            D = self.num_samples
-            z = z / np.sqrt(D)
+            z = z / np.sqrt(self.num_samples)
         return z
 
     def forward(self, x1, x2, diag=False, last_dim_is_batch=False, **kwargs):

@@ -15,6 +15,7 @@ Options:
   --lr=<lr>                        Learning rate
   --beta=<beta>                    Weight of KL term in ELBO
   --lbda=<lbda>                    CME inverse regularization term
+  --n_epochs=<n_epochs>            Number of training epochs
   --plot                           Outputs scatter plots.
   --seed=<seed>                    Random seed.
 """
@@ -46,9 +47,10 @@ def main(args, cfg):
     logging.info("Loaded and formatted cloud fields downscaling dataset\n")
 
     # Create model
-    cfg['model'].update(covariates_blocks=covariates_blocks)
+    logging.info("Initializing model")
+    cfg['model'].update(covariates_grid=covariates_grid)
     model = build_model(cfg['model'])
-    logging.info(f"Initialized model \n{model}\n")
+    logging.info(f"{model}\n")
 
     # Fit hyperparameters
     logging.info("Fitting model hyperparameters\n")
@@ -60,36 +62,9 @@ def main(args, cfg):
                            covariates_grid=covariates_grid,
                            groundtruth_field=groundtruth_field,
                            target_field=raw_aggregate_target_field,
-                           step_size=cfg['evaluation']['step_size'],
                            plot=args['--plot'],
                            dump_dir=args['--o'])
     train_model(cfg['training'])
-
-    # Compute individuals predictive posterior and plot prediction
-    logging.info("Predicting individuals posterior\n")
-    predict_kwargs = {'name': cfg['model']['name'],
-                      'model': model,
-                      'covariates_grid': covariates_grid,
-                      'target_field': raw_aggregate_target_field,
-                      'step_size': cfg['evaluation']['step_size']}
-    individuals_posterior = predict(predict_kwargs)
-
-    # Evaluate mean metrics
-    logging.info("Evaluating model\n")
-    evaluate_model(individuals_posterior=individuals_posterior,
-                   groundtruth_field=groundtruth_field,
-                   output_dir=args['--o'])
-
-
-def evaluate_model(individuals_posterior, groundtruth_field, output_dir):
-    """Computes MSE, MAE, Mean Bias, Spearman Correlation and SSIM between downscaled
-    field and groundtruth and dump into YAML metrics file
-    """
-    individuals_metrics = compute_metrics(individuals_posterior, groundtruth_field)
-    dump_path = os.path.join(output_dir, 'metrics.yaml')
-    with open(dump_path, 'w') as f:
-        yaml.dump(individuals_metrics, f)
-    logging.info(f"Metrics : {individuals_metrics}\n")
 
 
 def update_cfg(cfg, args):
@@ -117,6 +92,8 @@ def update_cfg(cfg, args):
         cfg['training']['lr'] = float(args['--lr'])
     if args['--beta']:
         cfg['training']['beta'] = float(args['--beta'])
+    if args['--n_epochs']:
+        cfg['training']['n_epochs'] = int(args['--n_epochs'])
     return cfg
 
 

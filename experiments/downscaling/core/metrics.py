@@ -134,12 +134,12 @@ def compute_metrics(individuals_posterior, groundtruth_field):
     ssim = structural_similarity(individuals_posterior.mean.view(1, 1, *groundtruth_field.shape),
                                  gt[None, None, :].detach())
     gt = gt.flatten()
-    mse = torch.pow(individuals_posterior.mean - gt, 2).mean()
+    rmse = torch.pow(individuals_posterior.mean - gt, 2).mean().sqrt()
     mae = torch.abs(individuals_posterior.mean - gt).mean()
     mb = torch.mean(individuals_posterior.mean - gt)
     corr = spearman_correlation(individuals_posterior.mean, gt)
 
-    individuals_metrics = {'mse': mse.item(),
+    individuals_metrics = {'rmse': rmse.item(),
                            'mae': mae.item(),
                            'mb': mb.item(),
                            'corr': corr.item(),

@@ -1,11 +1,14 @@
 # Define configuration files path variables
 VARIATIONAL_CME_CFG=experiments/downscaling/config/variational_cme_process.yaml
+VARIATIONAL_CME_INDIV_NOISE_CFG=experiments/downscaling/config/exact_cme_process_indiv_noise.yaml
+VBAGG_CFG=experiments/downscaling/config/vbagg.yaml
+KRIGGING_CFG=experiments/downscaling/config/krigging.yaml
 
 # Define output directories path variables
 VARIATIONAL_CME_OUTDIR=experiments/downscaling/data/experiment_outputs/coarseness/variational_cme_process
 
 # Run experiments for block size multiple seeds
-for SEED in 3 5 7 ;
+for SEED in 2 3 5 7 11 13;
 do
   DIRNAME=block_size_3/seed_$SEED
   python experiments/downscaling/run_experiment.py --plot --seed=$SEED --block_size=3 --batch_size=256 --cfg=$VARIATIONAL_CME_CFG --o=$VARIATIONAL_CME_OUTDIR/$DIRNAME
