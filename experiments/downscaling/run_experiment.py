@@ -25,8 +25,7 @@ import logging
 from docopt import docopt
 import xarray as xr
 import core.preprocessing as preproc
-from core.metrics import compute_metrics
-from models import build_model, train_model, predict
+from models import build_model, train_model
 
 
 def main(args, cfg):
@@ -48,7 +47,8 @@ def main(args, cfg):
 
     # Create model
     logging.info("Initializing model")
-    cfg['model'].update(covariates_grid=covariates_grid)
+    cfg['model'].update(covariates_grid=covariates_grid,
+                        bags_blocks=bags_blocks)
     model = build_model(cfg['model'])
     logging.info(f"{model}\n")
 

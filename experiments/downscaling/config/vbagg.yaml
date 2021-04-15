@@ -49,13 +49,13 @@ training:
   lr: 0.001
 
   # Number of iterations
-  n_epochs: 200
+  n_epochs: 400
 
   # Batch size
   batch_size: 47
 
   # Weight of KL term in ELBO
-  beta: 0.001
+  beta: 0.1
 
   # Random seed used to choose shuffle dataset
   seed: 42

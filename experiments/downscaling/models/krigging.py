@@ -87,7 +87,7 @@ def train_downscaling_variational_krigging(model, bags_blocks, targets_blocks,
             yield y, z
 
     # Define variational CME process likelihood
-    likelihood = gpytorch.likelihood.GaussianLikelihood()
+    likelihood = gpytorch.likelihoods.GaussianLikelihood()
 
     # Set model in training mode
     model = model.train().to(device)
@@ -162,7 +162,7 @@ def get_epoch_logs(model, likelihood, individuals_posterior, groundtruth_field):
     epoch_logs = compute_metrics(individuals_posterior, groundtruth_field)
 
     # Record model hyperparameters
-    k_spatial_kernel, k_feat_kernel = model.individuals_kernel.kernels
+    k_spatial_kernel, k_feat_kernel = model.covar_module.kernels
     k_spatial_lengthscales = k_spatial_kernel.base_kernel.lengthscale[0].detach().tolist()
     k_feat_lengthscales = k_feat_kernel.base_kernel.lengthscale[0].detach().tolist()
 

@@ -12,7 +12,7 @@ from core.metrics import compute_metrics
 
 
 @MODELS.register('vbagg')
-def build_downscaling_vbagg_model(covariates_grid, lbda, n_inducing_points, seed, **kwargs):
+def build_downscaling_vbagg_model(covariates_grid, n_inducing_points, seed, **kwargs):
     """Hard-coded initialization of Vbagg model used for downscaling experiment
 
     Args:
@@ -60,7 +60,7 @@ def build_downscaling_vbagg_model(covariates_grid, lbda, n_inducing_points, seed
 
 @TRAINERS.register('vbagg')
 def train_downscaling_vbagg_model(model, covariates_blocks, bags_blocks, extended_bags, targets_blocks,
-                                  lr, n_epochs, batch_size, beta, seed, dump_dir, bags_sizes, covariates_grid,
+                                  lr, n_epochs, batch_size, beta, seed, dump_dir, covariates_grid,
                                   groundtruth_field, target_field, plot, **kwargs):
     """Hard-coded training script of Vbagg model for downscaling experiment
 
@@ -101,7 +101,8 @@ def train_downscaling_vbagg_model(model, covariates_blocks, bags_blocks, extende
             y = bags_blocks[idx]
             extended_y = extended_bags[idx].reshape(-1, n_dim_bags)
             z = targets_blocks[idx]
-            yield x, y, extended_y, z
+            bags_sizes = [covariates_blocks.size(1)] * len(idx)
+            yield x, y, extended_y, z, bags_sizes
 
     # Define VBAGG likelihood
     likelihood = VBaggGaussianLikelihood()
@@ -131,7 +132,7 @@ def train_downscaling_vbagg_model(model, covariates_blocks, bags_blocks, extende
 
         batch_bar = Bar("Batch", max=len(targets_blocks) // batch_size)
 
-        for x, y, extended_y, z in batch_iterator(batch_size):
+        for x, y, extended_y, z, bags_sizes in batch_iterator(batch_size):
             # Zero-out remaining gradients
             optimizer.zero_grad()
 
@@ -180,7 +181,7 @@ def get_epoch_logs(model, likelihood, individuals_posterior, groundtruth_field):
     epoch_logs = compute_metrics(individuals_posterior, groundtruth_field)
 
     # Record model hyperparameters
-    k_spatial_kernel, k_feat_kernel = model.individuals_kernel.kernels
+    k_spatial_kernel, k_feat_kernel = model.covar_module.kernels
     k_spatial_lengthscales = k_spatial_kernel.base_kernel.lengthscale[0].detach().tolist()
     k_feat_lengthscales = k_feat_kernel.base_kernel.lengthscale[0].detach().tolist()
 

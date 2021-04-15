@@ -9,10 +9,16 @@
 #SBATCH --error=/data/ziz/not-backed-up/bouabid/tmp/slurm-%A_%a.o
 
 
-python experiments/downscaling/run_experiment.py --cfg=experiments/downscaling/config/variational_cme_process.yaml --o=sandbox/boo/boo_var_wo --n_epochs=2 --plot
-python experiments/downscaling/run_experiment.py --cfg=experiments/downscaling/config/variational_cme_process_indiv_noise.yaml --o=sandbox/boo/boo_var_w --n_epochs=2 --plot
+# python experiments/downscaling/run_experiment.py --cfg=experiments/downscaling/config/variational_cme_process.yaml --o=sandbox/boo/boo_var_wo --n_epochs=2 --plot
+# python experiments/downscaling/run_experiment.py --cfg=experiments/downscaling/config/variational_cme_process_indiv_noise.yaml --o=sandbox/boo/boo_var_w --n_epochs=2 --plot
 python experiments/downscaling/run_experiment.py --cfg=experiments/downscaling/config/vbagg.yaml --o=sandbox/boo/boo_vbagg --n_epochs=2 --plot
-python experiments/downscaling/run_experiment.py --cfg=experiments/downscaling/config/krigging.yaml --o=sandbox/sandbox/boo_krigging --n_epochs=2 --plot
+python experiments/downscaling/run_experiment.py --cfg=experiments/downscaling/config/krigging.yaml --o=sandbox/boo/boo_krigging --n_epochs=2 --plot
+
+
+python experiments/downscaling/run_experiment.py --cfg=experiments/downscaling/config/variational_cme_process.yaml --o=sandbox/sandbox/boo_var_wo --plot
+python experiments/downscaling/run_experiment.py --cfg=experiments/downscaling/config/variational_cme_process_indiv_noise.yaml --o=sandbox/sandbox/boo_var_w --plot
+python experiments/downscaling/run_experiment.py --cfg=experiments/downscaling/config/vbagg.yaml --o=sandbox/sandbox/boo_vbagg --plot
+python experiments/downscaling/run_experiment.py --cfg=experiments/downscaling/config/krigging.yaml --o=sandbox/sandbox/boo_krigging --plot
 
 #pyenv activate deconditioning
 # python experiments/swiss_roll/run_experiment.py --cfg=experiments/swiss_roll/config/exact_cme_process.yaml --o=sandbox/boo/boo_exact_wo --n_epochs=2

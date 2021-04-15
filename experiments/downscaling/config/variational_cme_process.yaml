@@ -58,7 +58,7 @@ training:
   lr: 0.001
 
   # Number of iterations
-  n_epochs: 200
+  n_epochs: 400
 
   # Batch size
   batch_size: 47
