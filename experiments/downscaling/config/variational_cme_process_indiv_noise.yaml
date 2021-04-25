@@ -9,7 +9,7 @@ model:
   name: 'variational_cme_process'
 
   # CME regularization parameter
-  lbda: 0.001
+  lbda: 0.00001
 
   # Number of inducing points
   n_inducing_points: 1000
@@ -55,16 +55,19 @@ training:
   use_individuals_noise: True
 
   # Learning rate
-  lr: 0.001
+  lr: 0.003
 
   # Number of iterations
-  n_epochs: 400
+  n_epochs: 201
 
   # Batch size
   batch_size: 47
 
   # Weight of KL term in ELBO
-  beta: 0.001
+  beta: 0.01
+
+  # Plot end of epoch inference every n epoch
+  plot_every: 50
 
   # Random seed used to choose shuffle dataset
   seed: 42

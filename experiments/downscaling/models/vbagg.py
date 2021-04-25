@@ -31,10 +31,10 @@ def build_downscaling_vbagg_model(covariates_grid, n_inducing_points, seed, **kw
     individuals_mean = gpytorch.means.ZeroMean()
 
     # Define individuals kernel
-    base_indiv_spatial_kernel = RFFKernel(which='laplace', num_samples=500, ard_num_dims=3, active_dims=[0, 1, 2])
+    base_indiv_spatial_kernel = RFFKernel(nu=1.5, num_samples=1000, ard_num_dims=3, active_dims=[0, 1, 2])
     base_indiv_spatial_kernel.initialize(raw_lengthscale=inv_softplus(x=1, n=3))
 
-    base_indiv_feat_kernel = RFFKernel(which='laplace', num_samples=500, ard_num_dims=3, active_dims=[3, 4, 5])
+    base_indiv_feat_kernel = gpytorch.kernels.RFFKernel(num_samples=1000, ard_num_dims=3, active_dims=[3, 4, 5])
     base_indiv_feat_kernel.initialize(raw_lengthscale=inv_softplus(x=1, n=3))
 
     individuals_spatial_kernel = gpytorch.kernels.ScaleKernel(base_indiv_spatial_kernel)
@@ -61,7 +61,7 @@ def build_downscaling_vbagg_model(covariates_grid, n_inducing_points, seed, **kw
 @TRAINERS.register('vbagg')
 def train_downscaling_vbagg_model(model, covariates_blocks, bags_blocks, extended_bags, targets_blocks,
                                   lr, n_epochs, batch_size, beta, seed, dump_dir, covariates_grid,
-                                  groundtruth_field, target_field, plot, **kwargs):
+                                  groundtruth_field, target_field, plot, plot_every, **kwargs):
     """Hard-coded training script of Vbagg model for downscaling experiment
 
     Args:
@@ -162,12 +162,17 @@ def train_downscaling_vbagg_model(model, covariates_blocks, bags_blocks, extende
             yaml.dump({'epoch': logs}, f)
 
         # Dump plot of posterior prediction at current epoch
-        if plot:
+        if plot and epoch % plot_every == 0:
             _ = plot_downscaling_prediction(individuals_posterior, groundtruth_field, target_field)
             plt.savefig(os.path.join(dump_dir, f'png/epoch_{epoch}.png'))
             plt.close()
         epoch_bar.next()
         epoch_bar.finish()
+
+        # Empty cache if using GPU
+        if torch.cuda.is_available():
+            del individuals_posterior
+            torch.cuda.empty_cache()
 
     # Save model training state
     state = {'epoch': n_epochs,
@@ -208,59 +213,11 @@ def predict_downscaling_vbagg_model(model, covariates_grid, mean_shift, std_scal
         individuals_posterior = model(covariates_grid.view(-1, covariates_grid.size(-1)))
 
     # Rescale by mean and std from observed aggregate target field
-    mean_posterior = mean_shift + std_scale * individuals_posterior.mean
-    lazy_covariance_posterior = (std_scale**2) * individuals_posterior.lazy_covariance_matrix
+    mean_posterior = mean_shift + std_scale * individuals_posterior.mean.cpu()
+    lazy_covariance_posterior = (std_scale**2) * individuals_posterior.lazy_covariance_matrix.cpu()
     output = gpytorch.distributions.MultivariateNormal(mean=mean_posterior,
                                                        covariance_matrix=lazy_covariance_posterior)
 
     # Set model back to training mode
     model.train()
     return output
-
-
-# @PREDICTERS.register('vbagg')
-# def predict_downscaling_vbagg_model(model, covariates_grid, step_size, target_field, **kwargs):
-#     """Hard-coded prediciton of individuals posterior for VbAgg on
-#     downscaling experiment
-#
-#         Temporary not predicting covariance – need RFF inference first
-#
-#     Args:
-#         model (VariationalGP)
-#         covariates_grid (torch.Tensor)
-#         step_size (int)
-#         target_field (torch.Tensor)
-#
-#     Returns:
-#         type: gpytorch.distributions.MultivariateNormal
-#
-#     """
-#     # Set model in evaluation mode
-#     model.eval()
-#
-#     # Compute predictive posterior on individuals
-#     bar = Bar("Predicting", max=covariates_grid.size(0) // step_size)
-#     row_wise_pred = []
-#     for i in range(0, covariates_grid.size(0), step_size):
-#         col_wise_pred = []
-#         for j in range(0, covariates_grid.size(1), step_size):
-#             x_test = covariates_grid[i:i + step_size, j:j + step_size]
-#             block_size = x_test.shape[:-1]
-#             with torch.no_grad():
-#                 individuals_posterior = model(x_test.reshape(-1, covariates_grid.size(-1)))
-#             output = individuals_posterior.mean.reshape(*block_size)
-#             col_wise_pred.append(output)
-#         row_tensor = torch.cat(col_wise_pred, dim=1)
-#         row_wise_pred.append(row_tensor)
-#         bar.next()
-#
-#     # Encapsulate as MultivariateNormal
-#     mean_posterior = torch.cat(row_wise_pred, dim=0).flatten() * target_field.values.std() + target_field.values.mean()
-#     mean_posterior = mean_posterior.cpu()
-#     dummy_covariance = gpytorch.lazy.DiagLazyTensor(diag=torch.ones_like(mean_posterior))
-#     individuals_posterior = gpytorch.distributions.MultivariateNormal(mean=mean_posterior,
-#                                                                       covariance_matrix=dummy_covariance)
-#
-#     # Set model back to training mode
-#     model.train()
-#     return individuals_posterior

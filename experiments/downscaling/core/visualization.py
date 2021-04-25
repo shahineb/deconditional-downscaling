@@ -5,12 +5,12 @@ import matplotlib.pyplot as plt
 def plot_downscaling_prediction(individuals_posterior, groundtruth_field, target_field):
     # Prepare fields to plot
     groundtruth = torch.from_numpy(groundtruth_field.values)
-    mean_pred = individuals_posterior.mean.reshape(*groundtruth.shape)
+    mean_pred = individuals_posterior.mean.reshape(*groundtruth.shape).cpu()
     difference = groundtruth - mean_pred
     squared_error = difference.pow(2)
     conf = individuals_posterior.confidence_region()
     conf_size = conf[1] - conf[0]
-    conf_size = conf_size.reshape(*mean_pred.shape)
+    conf_size = conf_size.reshape(*mean_pred.shape).cpu()
 
     # Get values range for prediction and difference
     max_value = torch.max(torch.stack([groundtruth.max(),
