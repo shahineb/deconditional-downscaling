@@ -1,3 +1,4 @@
+import numpy as np
 import xarray as xr
 import torch
 
@@ -92,21 +93,63 @@ def load_field(file_path, date=None):
     return field
 
 
+# def coarsen(field, block_size):
+#     """Downsamples dataarray along latitude and longitude according to xarray
+#         coarsening method. If not multiple of coarsening block size, borders are
+#         trimmed.
+#
+#     Args:
+#         field (xarray.core.dataarray.DataArray)
+#         block_size (tuple[int]): (height, width) dimensions of blocks to average
+#
+#     Returns:
+#         type: xarray.core.dataarray.DataArray
+#
+#     """
+#     output = field.coarsen(lat=block_size[0], boundary='trim').mean()
+#     output = output.coarsen(lon=block_size[1], boundary='trim').mean()
+#     return output
+
+
 def coarsen(field, block_size):
-    """Downsamples dataarray along latitude and longitude according to xarray
-        coarsening method. If not multiple of coarsening block size, borders are
-        trimmed.
+    def make_alpha_map(omega, amin, amax, K):
+        def alpha_map(x):
+            ys = []
+            for k in range(K):
+                y1 = torch.sin(omega * x.sum(dim=-1) + 2 * np.pi * k / K)
+                y2 = torch.sin(omega * (x[..., 0] - x[..., 1]) + 0.5 * np.pi * k / K)
+                y = y1 + y2
+                y = amax * (y - y.min()) / (y.max() - y.min()) + amin
+                ys.append(y)
+            ys = np.stack(ys, axis=-1)
+            return ys
+        return alpha_map
 
-    Args:
-        field (xarray.core.dataarray.DataArray)
-        block_size (tuple[int]): (height, width) dimensions of blocks to average
+    field = trim(field=field, block_size=block_size)
 
-    Returns:
-        type: xarray.core.dataarray.DataArray
+    # Create coarse lat/lon grid - conditioning variables
+    lat_lon_grid = make_lat_lon_grid_tensor(field)
+    bag_size = block_size[0] * block_size[1]
+    coarse_height = lat_lon_grid.size(0) // block_size[0]
+    coarse_width = lat_lon_grid.size(1) // block_size[1]
+    bags_lat_lon = torch.cat([torch.stack(x.split(block_size[0], dim=1))
+                              for x in lat_lon_grid.split(block_size[1])]).view(-1, bag_size, 2).mean(dim=1)
 
-    """
-    output = field.coarsen(lat=block_size[0], boundary='trim').mean()
-    output = output.coarsen(lon=block_size[1], boundary='trim').mean()
+    # Draw conditional weights for each bag
+    alpha_map = make_alpha_map(omega=4, amin=1e-4, amax=0.1, K=bag_size)
+    alphas = alpha_map(bags_lat_lon)
+    np.random.seed(5)
+    agg_weights = [np.random.dirichlet(alpha) for alpha in alphas]
+
+    # Aggregate based on conditional measures
+    groundtruth_tensor = torch.from_numpy(field.values)
+    gt_blocks = torch.stack([torch.stack(x.split(block_size[0], dim=1))
+                             for x in groundtruth_tensor.split(block_size[1])]).view(-1, bag_size)
+    weigthed_gt = gt_blocks * agg_weights
+    aggregate_gt = weigthed_gt.sum(dim=-1).reshape(coarse_height, coarse_width)
+
+    # Cast as xarray
+    output = xr.DataArray(aggregate_gt.numpy())
     return output
 
 

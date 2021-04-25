@@ -32,8 +32,8 @@ dataset:
 
   # Downsampling block size
   block_size:
-    - 7             # height
-    - 7             # width
+    - 17             # height
+    - 17             # width
 
   # Random seed for dataset generation
   seed: 42
