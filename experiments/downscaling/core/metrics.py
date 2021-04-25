@@ -6,7 +6,7 @@ import torch.nn.functional as F
 def _get_ranks(x):
     tmp = x.argsort()
     ranks = torch.zeros_like(tmp)
-    ranks[tmp] = torch.arange(len(x))
+    ranks[tmp] = torch.arange(len(x)).to(x.device)
     return ranks
 
 
@@ -130,9 +130,11 @@ def compute_metrics(individuals_posterior, groundtruth_field):
     """Computes MSE, MAE, Mean Bias, Spearman Correlation and SSIM between downscaled
     field and groundtruth and dump into YAML metrics file
     """
-    gt = torch.from_numpy(groundtruth_field.values)
-    ssim = structural_similarity(individuals_posterior.mean.view(1, 1, *groundtruth_field.shape),
-                                 gt[None, None, :].detach())
+    gt = torch.from_numpy(groundtruth_field.values).to(individuals_posterior.mean.device)
+    structural_similarity.to(individuals_posterior.mean.device)
+    with torch.no_grad():
+        ssim = structural_similarity(individuals_posterior.mean.view(1, 1, *groundtruth_field.shape),
+                                     gt[None, None, :].detach())
     gt = gt.flatten()
     rmse = torch.pow(individuals_posterior.mean - gt, 2).mean().sqrt()
     mae = torch.abs(individuals_posterior.mean - gt).mean()

@@ -45,10 +45,10 @@ training:
   name: 'krigging'
 
   # Learning rate
-  lr: 0.001
+  lr: 0.003
 
   # Number of iterations
-  n_epochs: 400
+  n_epochs: 201
 
   # Batch size
   batch_size: 47
@@ -56,8 +56,12 @@ training:
   # Weight of KL term in ELBO
   beta: 1
 
+  # Plot end of epoch inference every n epoch
+  plot_every: 50
+
   # Random seed used to choose shuffle dataset
   seed: 42
+
 
 
 # EVALUATION
