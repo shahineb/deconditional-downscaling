@@ -17,8 +17,8 @@
 
 # python experiments/downscaling/run_experiment.py --cfg=experiments/downscaling/config/variational_cme_process.yaml --o=sandbox/sandbox/boo_var_wo --plot
 python experiments/downscaling/run_experiment.py --cfg=experiments/downscaling/config/variational_cme_process_indiv_noise.yaml --o=sandbox/sandbox/boo_var_w --plot
-python experiments/downscaling/run_experiment.py --cfg=experiments/downscaling/config/vbagg.yaml --o=sandbox/sandbox/boo_vbagg --plot
-python experiments/downscaling/run_experiment.py --cfg=experiments/downscaling/config/krigging.yaml --o=sandbox/sandbox/boo_krigging --plot
+# python experiments/downscaling/run_experiment.py --cfg=experiments/downscaling/config/vbagg.yaml --o=sandbox/sandbox/boo_vbagg --plot
+# python experiments/downscaling/run_experiment.py --cfg=experiments/downscaling/config/krigging.yaml --o=sandbox/sandbox/boo_krigging --plot
 
 #pyenv activate deconditioning
 # python experiments/swiss_roll/run_experiment.py --cfg=experiments/swiss_roll/config/exact_cme_process.yaml --o=sandbox/boo/boo_exact_wo --n_epochs=2

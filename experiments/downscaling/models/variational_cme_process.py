@@ -107,17 +107,56 @@ def train_downscaling_variational_cme_process(model, covariates_blocks, bags_blo
     extended_bags = extended_bags.to(device)
     targets_blocks = targets_blocks.to(device)
 
-    # Define stochastic batch iterator
+    ################################################################ Drop certain bags
+    n_drop = len(targets_blocks) // 2
+    torch.random.manual_seed(5)
+    rdm_indices = torch.randperm(len(targets_blocks)).to(device)
+
+    paired_covariates_blocks = covariates_blocks[rdm_indices[n_drop:]]
+    paired_bags_blocks = bags_blocks[rdm_indices[n_drop:]]
+    paired_extended_bags = extended_bags[rdm_indices[n_drop:]]
+    paired_targets_blocks = targets_blocks[rdm_indices[n_drop:]]
+
+    n_dim_individuals = covariates_blocks.size(-1)
+    n_dim_bags = bags_blocks.size(-1)
+    leftovers_covariates = covariates_blocks[rdm_indices[:n_drop]].reshape(-1, n_dim_individuals)
+    leftovers_extended_bags = extended_bags[rdm_indices[:n_drop]].reshape(-1, n_dim_bags)
+
+    def leftovers_iterator(batch_size):
+        buffer = torch.ones(len(leftovers_covariates)).to(device)
+        while True:
+            idx = buffer.multinomial(batch_size)
+            x = leftovers_covariates[idx]
+            extended_y = leftovers_extended_bags[idx]
+            yield x, extended_y
+
     def batch_iterator(batch_size):
-        rdm_indices = torch.randperm(len(targets_blocks)).to(device)
+        rdm_indices = torch.randperm(len(paired_targets_blocks)).to(device)
         n_dim_individuals = covariates_blocks.size(-1)
         n_dim_bags = bags_blocks.size(-1)
+        unpaired_samples_sampler = leftovers_iterator(batch_size * covariates_blocks.size(1))
         for idx in rdm_indices.split(batch_size):
-            x = covariates_blocks[idx].reshape(-1, n_dim_individuals)
-            y = bags_blocks[idx]
-            extended_y = extended_bags[idx].reshape(-1, n_dim_bags)
-            z = targets_blocks[idx]
+            x = paired_covariates_blocks[idx].reshape(-1, n_dim_individuals)
+            y = paired_bags_blocks[idx]
+            extended_y = paired_extended_bags[idx].reshape(-1, n_dim_bags)
+            z = paired_targets_blocks[idx]
+            leftovers_x, leftovers_extended_y = next(unpaired_samples_sampler)
+            x = torch.cat([x, leftovers_x])
+            extended_y = torch.cat([extended_y, leftovers_extended_y])
             yield x, y, extended_y, z
+    ################################################################################################
+
+    # # Define stochastic batch iterator
+    # def batch_iterator(batch_size):
+    #     rdm_indices = torch.randperm(len(targets_blocks)).to(device)
+    #     n_dim_individuals = covariates_blocks.size(-1)
+    #     n_dim_bags = bags_blocks.size(-1)
+    #     for idx in rdm_indices.split(batch_size):
+    #         x = covariates_blocks[idx].reshape(-1, n_dim_individuals)
+    #         y = bags_blocks[idx]
+    #         extended_y = extended_bags[idx].reshape(-1, n_dim_bags)
+    #         z = targets_blocks[idx]
+    #         yield x, y, extended_y, z
 
     # Define variational CME process likelihood
     likelihood = CMEProcessLikelihood(use_individuals_noise=use_individuals_noise)

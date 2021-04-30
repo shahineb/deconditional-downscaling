@@ -78,6 +78,14 @@ def train_downscaling_variational_krigging(model, bags_blocks, targets_blocks,
     bags_blocks = bags_blocks.to(device)
     targets_blocks = targets_blocks.to(device)
 
+    ######## Drop certain bags
+    n_drop = len(targets_blocks) // 2
+    torch.random.manual_seed(5)
+    rdm_indices = torch.randperm(len(targets_blocks)).to(device)[n_drop:]
+    bags_blocks = bags_blocks[rdm_indices]
+    targets_blocks = targets_blocks[rdm_indices]
+    ########
+
     # Define stochastic batch iterator
     def batch_iterator(batch_size):
         rdm_indices = torch.randperm(len(targets_blocks)).to(device)

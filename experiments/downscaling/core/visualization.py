@@ -28,6 +28,16 @@ def plot_downscaling_prediction(individuals_posterior, groundtruth_field, target
     fontsize = 24
 
     # Plot observed LR field
+    ####### Drop unobserved bags
+    M = target_field.shape[0] * target_field.shape[1]
+    n_drop = M // 2
+    torch.random.manual_seed(5)
+    rdm_indices = torch.randperm(M)[n_drop:].tolist()
+    foo = target_field.values.flatten()
+    foo[rdm_indices] = foo.min()
+    target_field.values = foo.reshape(*target_field.shape)
+    #######
+
     im = ax[0, 0].imshow(target_field.values[::-1], cmap=field_cmap, vmin=min_value, vmax=max_value)
     ax[0, 0].axis('off')
     ax[0, 0].set_title("Observed LR field", fontsize=fontsize)
