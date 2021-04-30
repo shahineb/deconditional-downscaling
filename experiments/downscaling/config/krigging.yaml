@@ -51,7 +51,7 @@ training:
   n_epochs: 201
 
   # Batch size
-  batch_size: 47
+  batch_size: 8
 
   # Weight of KL term in ELBO
   beta: 1

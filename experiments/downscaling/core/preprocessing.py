@@ -139,7 +139,7 @@ def coarsen(field, block_size):
     alpha_map = make_alpha_map(omega=4, amin=1e-4, amax=0.1, K=bag_size)
     alphas = alpha_map(bags_lat_lon)
     np.random.seed(5)
-    agg_weights = [np.random.dirichlet(alpha) for alpha in alphas]
+    agg_weights = np.stack([np.random.dirichlet(alpha) for alpha in alphas])
 
     # Aggregate based on conditional measures
     groundtruth_tensor = torch.from_numpy(field.values)
@@ -149,8 +149,10 @@ def coarsen(field, block_size):
     aggregate_gt = weigthed_gt.sum(dim=-1).reshape(coarse_height, coarse_width)
 
     # Cast as xarray
-    output = xr.DataArray(aggregate_gt.numpy())
-    return output
+    buffer = field.coarsen(lat=block_size[0], boundary='trim').mean()
+    buffer = buffer.coarsen(lon=block_size[1], boundary='trim').mean()
+    buffer.values = aggregate_gt.numpy()
+    return buffer
 
 
 def trim(field, block_size):
