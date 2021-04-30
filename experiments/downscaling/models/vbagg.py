@@ -97,6 +97,7 @@ def train_downscaling_vbagg_model(model, covariates_blocks, bags_blocks, extende
     rdm_indices = torch.randperm(len(targets_blocks)).to(device)[n_drop:]
     covariates_blocks = covariates_blocks[rdm_indices]
     bags_blocks = bags_blocks[rdm_indices]
+    extended_bags = extended_bags[rdm_indices]
     targets_blocks = targets_blocks[rdm_indices]
     ########
 
