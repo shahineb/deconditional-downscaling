@@ -12,7 +12,7 @@ model:
   lbda: 0.00001
 
   # Number of inducing points
-  n_inducing_points: 1000
+  n_inducing_points: 800
 
   # Whether to use noised individuals model or not
   use_individuals_noise: True
@@ -38,8 +38,8 @@ dataset:
 
   # Downsampling block size
   block_size:
-    - 17             # height
-    - 17             # width
+    - 36             # height
+    - 36             # width
 
   # Random seed for dataset generation
   seed: 42
@@ -51,6 +51,9 @@ training:
   # Name of model to use
   name: 'variational_cme_process'
 
+  # Fraction of missing bags
+  missing_bags_fraction: 0.5
+
   # Whether to use noised individuals model or not
   use_individuals_noise: True
 
@@ -58,13 +61,16 @@ training:
   lr: 0.003
 
   # Number of iterations
-  n_epochs: 201
+  n_epochs: 601
 
   # Batch size
   batch_size: 8
 
+  # Number of samples used for batch CMO estimation
+  batch_size_cme: 200
+
   # Weight of KL term in ELBO
-  beta: 0.01
+  beta: 1
 
   # Plot end of epoch inference every n epoch
   plot_every: 50

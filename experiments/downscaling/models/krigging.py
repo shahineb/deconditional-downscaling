@@ -59,7 +59,7 @@ def build_downscaling_variational_krigging(bags_blocks, n_inducing_points, seed,
 @TRAINERS.register('krigging')
 def train_downscaling_variational_krigging(model, bags_blocks, targets_blocks,
                                            lr, n_epochs, batch_size, beta, seed, dump_dir, covariates_grid,
-                                           groundtruth_field, target_field, plot, plot_every, **kwargs):
+                                           groundtruth_field, target_field, missing_bags_fraction, plot, plot_every, **kwargs):
     """Hard-coded training script of Vbagg model for downscaling experiment
 
     Args:
@@ -78,13 +78,13 @@ def train_downscaling_variational_krigging(model, bags_blocks, targets_blocks,
     bags_blocks = bags_blocks.to(device)
     targets_blocks = targets_blocks.to(device)
 
-    ######## Drop certain bags
-    n_drop = len(targets_blocks) // 2
-    torch.random.manual_seed(5)
-    rdm_indices = torch.randperm(len(targets_blocks)).to(device)[n_drop:]
-    bags_blocks = bags_blocks[rdm_indices]
-    targets_blocks = targets_blocks[rdm_indices]
-    ########
+    # Drop some bags
+    if seed:
+        torch.random.manual_seed(seed)
+    n_drop = int(missing_bags_fraction * len(targets_blocks))
+    drop_idx = torch.randperm(len(targets_blocks)).to(device)[:n_drop]
+    bags_blocks = bags_blocks[~drop_idx]
+    targets_blocks = targets_blocks[~drop_idx]
 
     # Define stochastic batch iterator
     def batch_iterator(batch_size):
@@ -94,7 +94,7 @@ def train_downscaling_variational_krigging(model, bags_blocks, targets_blocks,
             z = targets_blocks[idx]
             yield y, z
 
-    # Define variational CME process likelihood
+    # Define Gaussian likelihood
     likelihood = gpytorch.likelihoods.GaussianLikelihood()
 
     # Set model in training mode
@@ -105,8 +105,6 @@ def train_downscaling_variational_krigging(model, bags_blocks, targets_blocks,
     parameters = list(model.parameters()) + list(likelihood.parameters())
     optimizer = torch.optim.Adam(params=parameters, lr=lr)
     elbo = gpytorch.mlls.VariationalELBO(likelihood, model, num_data=len(targets_blocks), beta=beta)
-    if seed:
-        torch.random.manual_seed(seed)
 
     # Compute unnormalization mean shift and scaling for prediction
     mean_shift = target_field.values.mean()
@@ -122,6 +120,7 @@ def train_downscaling_variational_krigging(model, bags_blocks, targets_blocks,
     for epoch in range(n_epochs):
 
         batch_bar = Bar("Batch", max=len(targets_blocks) // batch_size)
+        epoch_loss = 0
 
         for y, z in batch_iterator(batch_size):
             # Zero-out remaining gradients
@@ -137,7 +136,8 @@ def train_downscaling_variational_krigging(model, bags_blocks, targets_blocks,
             loss.backward()
             optimizer.step()
 
-            batch_bar.suffix = f"ELBO {-loss.item()}"
+            epoch_loss += loss.item()
+            batch_bar.suffix = f"Running ELBO {-loss.item()}"
             batch_bar.next()
 
         # Compute posterior distribution at current epoch and store logs
@@ -146,13 +146,14 @@ def train_downscaling_variational_krigging(model, bags_blocks, targets_blocks,
                                                                          mean_shift=mean_shift,
                                                                          std_scale=std_scale)
         epoch_logs = get_epoch_logs(model, likelihood, individuals_posterior, groundtruth_field)
+        epoch_logs.update({'loss': epoch_loss / (len(targets_blocks) // batch_size)})
         logs[epoch + 1] = epoch_logs
         with open(os.path.join(dump_dir, 'running_logs.yaml'), 'w') as f:
             yaml.dump({'epoch': logs}, f)
 
         # Dump plot of posterior prediction at current epoch
         if plot and epoch % plot_every == 0:
-            _ = plot_downscaling_prediction(individuals_posterior, groundtruth_field, target_field)
+            _ = plot_downscaling_prediction(individuals_posterior, groundtruth_field, target_field, drop_idx)
             plt.savefig(os.path.join(dump_dir, f'png/epoch_{epoch}.png'))
             plt.close()
         epoch_bar.next()

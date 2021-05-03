@@ -94,11 +94,11 @@ class CMEProcessLikelihood(GaussianLikelihood):
         """
         # Extract variational posterior parameters
         variational_mean = variational_dist.mean
-        variational_root_covar = variational_dist.lazy_covariance_matrix.root_decomposition().root
+        variational_covar_cholesky = variational_dist.lazy_covariance_matrix.cholesky()
 
         # Setup identity lazy tensor for efficient quad computations
         Id_n = lazy.DiagLazyTensor(diag=torch.ones_like(observations))
-        Id_N = lazy.DiagLazyTensor(diag=torch.ones(variational_root_covar.size(-1), device=variational_mean.device))
+        Id_N = lazy.DiagLazyTensor(diag=torch.ones(variational_covar_cholesky.size(-1), device=variational_mean.device))
 
         # Compute low rank A^T aggregation term, agg_term = l(bags, extended_bags)(L + λNI)^{-1/2}
         agg_term = bags_to_extended_bags_covar @ root_inv_extended_bags_covar
@@ -107,9 +107,9 @@ class CMEProcessLikelihood(GaussianLikelihood):
         mean_term = Id_n.inv_quad(observations - agg_term @ root_inv_extended_bags_covar.t() @ variational_mean)
 
         # Compute covariance loss term
-        covar_term = Id_N.inv_quad(variational_root_covar.t() @ root_inv_extended_bags_covar @ agg_term.t())
+        covar_term = Id_N.inv_quad(variational_covar_cholesky.t() @ root_inv_extended_bags_covar @ agg_term.t())
 
         # Sum up everything to obtain expected logprob under variational distribution
-        constant_term = len(observations) * (np.log(2 * np.pi) + torch.log(self.noise))
+        constant_term = len(observations) * torch.log(2 * np.pi * self.noise)
         output = -0.5 * (constant_term + (mean_term + covar_term) / self.noise)
         return output

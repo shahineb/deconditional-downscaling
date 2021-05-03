@@ -6,6 +6,7 @@ sys.path.append(base_dir)
 
 from src.models import VariationalGP, VariationalCMEProcess
 from src.likelihoods import CMEProcessLikelihood, VBaggGaussianLikelihood
+from src.mlls import BagVariationalELBO
 from src.kernels import RFFKernel
 from src.utils import Registry
 """

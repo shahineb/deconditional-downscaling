@@ -6,7 +6,7 @@ import gpytorch
 import matplotlib.pyplot as plt
 from sklearn.cluster import KMeans
 from progress.bar import Bar
-from models import VariationalGP, VBaggGaussianLikelihood, RFFKernel, MODELS, TRAINERS, PREDICTERS
+from models import VariationalGP, VBaggGaussianLikelihood, BagVariationalELBO, RFFKernel, MODELS, TRAINERS, PREDICTERS
 from core.visualization import plot_downscaling_prediction
 from core.metrics import compute_metrics
 
@@ -60,7 +60,7 @@ def build_downscaling_vbagg_model(covariates_grid, n_inducing_points, seed, **kw
 
 @TRAINERS.register('vbagg')
 def train_downscaling_vbagg_model(model, covariates_blocks, bags_blocks, extended_bags, targets_blocks,
-                                  lr, n_epochs, batch_size, beta, seed, dump_dir, covariates_grid,
+                                  lr, n_epochs, batch_size, beta, seed, dump_dir, covariates_grid, missing_bags_fraction,
                                   groundtruth_field, target_field, plot, plot_every, **kwargs):
     """Hard-coded training script of Vbagg model for downscaling experiment
 
@@ -88,31 +88,27 @@ def train_downscaling_vbagg_model(model, covariates_blocks, bags_blocks, extende
     covariates_grid = covariates_grid.to(device)
     covariates_blocks = covariates_blocks.to(device)
     bags_blocks = bags_blocks.to(device)
-    extended_bags = extended_bags.to(device)
     targets_blocks = targets_blocks.to(device)
 
-    ######## Drop certain bags
-    n_drop = len(targets_blocks) // 2
-    torch.random.manual_seed(5)
-    rdm_indices = torch.randperm(len(targets_blocks)).to(device)[n_drop:]
-    covariates_blocks = covariates_blocks[rdm_indices]
-    bags_blocks = bags_blocks[rdm_indices]
-    extended_bags = extended_bags[rdm_indices]
-    targets_blocks = targets_blocks[rdm_indices]
-    ########
+    # Drop some bags
+    if seed:
+        torch.random.manual_seed(seed)
+    n_drop = int(missing_bags_fraction * len(targets_blocks))
+    drop_idx = torch.randperm(len(targets_blocks)).to(device)[:n_drop]
+    covariates_grid = covariates_grid[~drop_idx]
+    bags_blocks = bags_blocks[~drop_idx]
+    targets_blocks = targets_blocks[~drop_idx]
 
     # Define stochastic batch iterator
     def batch_iterator(batch_size):
         rdm_indices = torch.randperm(len(targets_blocks)).to(device)
         n_dim_individuals = covariates_blocks.size(-1)
-        n_dim_bags = bags_blocks.size(-1)
         for idx in rdm_indices.split(batch_size):
             x = covariates_blocks[idx].reshape(-1, n_dim_individuals)
             y = bags_blocks[idx]
-            extended_y = extended_bags[idx].reshape(-1, n_dim_bags)
             z = targets_blocks[idx]
             bags_sizes = [covariates_blocks.size(1)] * len(idx)
-            yield x, y, extended_y, z, bags_sizes
+            yield x, y, z, bags_sizes
 
     # Define VBAGG likelihood
     likelihood = VBaggGaussianLikelihood()
@@ -124,9 +120,7 @@ def train_downscaling_vbagg_model(model, covariates_blocks, bags_blocks, extende
     # Define optimizer and elbo module
     parameters = list(model.parameters()) + list(likelihood.parameters())
     optimizer = torch.optim.Adam(params=parameters, lr=lr)
-    elbo = gpytorch.mlls.VariationalELBO(likelihood, model, num_data=len(targets_blocks), beta=beta)
-    if seed:
-        torch.random.manual_seed(seed)
+    elbo = BagVariationalELBO(likelihood, model, num_data=len(targets_blocks), beta=beta)
 
     # Compute unnormalization mean shift and scaling for prediction
     mean_shift = target_field.values.mean()
@@ -141,8 +135,9 @@ def train_downscaling_vbagg_model(model, covariates_blocks, bags_blocks, extende
     for epoch in range(n_epochs):
 
         batch_bar = Bar("Batch", max=len(targets_blocks) // batch_size)
+        epoch_loss = 0
 
-        for x, y, extended_y, z, bags_sizes in batch_iterator(batch_size):
+        for x, y, z, bags_sizes in batch_iterator(batch_size):
             # Zero-out remaining gradients
             optimizer.zero_grad()
 
@@ -158,7 +153,8 @@ def train_downscaling_vbagg_model(model, covariates_blocks, bags_blocks, extende
             loss.backward()
             optimizer.step()
 
-            batch_bar.suffix = f"ELBO {-loss.item()}"
+            epoch_loss += loss.item()
+            batch_bar.suffix = f"Running ELBO {-loss.item()}"
             batch_bar.next()
 
         # Compute posterior distribution at current epoch and store metrics
@@ -167,6 +163,7 @@ def train_downscaling_vbagg_model(model, covariates_blocks, bags_blocks, extende
                                                                 mean_shift=mean_shift,
                                                                 std_scale=std_scale)
         epoch_logs = get_epoch_logs(model, likelihood, individuals_posterior, groundtruth_field)
+        epoch_logs.update({'loss': epoch_loss / (len(targets_blocks) // batch_size)})
         logs[epoch + 1] = epoch_logs
         with open(os.path.join(dump_dir, 'running_logs.yaml'), 'w') as f:
             yaml.dump({'epoch': logs}, f)

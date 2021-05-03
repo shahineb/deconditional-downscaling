@@ -6,7 +6,7 @@ import gpytorch
 import matplotlib.pyplot as plt
 from sklearn.cluster import KMeans
 from progress.bar import Bar
-from models import VariationalCMEProcess, CMEProcessLikelihood, RFFKernel, MODELS, TRAINERS, PREDICTERS
+from models import VariationalCMEProcess, CMEProcessLikelihood, BagVariationalELBO, RFFKernel, MODELS, TRAINERS, PREDICTERS
 from core.visualization import plot_downscaling_prediction
 from core.metrics import compute_metrics
 
@@ -75,8 +75,8 @@ def build_downscaling_variational_cme_process(covariates_grid, lbda, n_inducing_
 
 
 @TRAINERS.register('variational_cme_process')
-def train_downscaling_variational_cme_process(model, covariates_blocks, bags_blocks, extended_bags, targets_blocks,
-                                              lr, n_epochs, batch_size, beta, seed, dump_dir, covariates_grid,
+def train_downscaling_variational_cme_process(model, covariates_blocks, bags_blocks, extended_bags, targets_blocks, batch_size_cme,
+                                              lr, n_epochs, batch_size, beta, seed, dump_dir, covariates_grid, missing_bags_fraction,
                                               use_individuals_noise, groundtruth_field, target_field, plot, plot_every, **kwargs):
     """Hard-coded training script of Exact CME Process for downscaling experiment
 
@@ -107,56 +107,36 @@ def train_downscaling_variational_cme_process(model, covariates_blocks, bags_blo
     extended_bags = extended_bags.to(device)
     targets_blocks = targets_blocks.to(device)
 
-    ################################################################ Drop certain bags
-    n_drop = len(targets_blocks) // 2
-    torch.random.manual_seed(5)
-    rdm_indices = torch.randperm(len(targets_blocks)).to(device)
+    # Drop some bags
+    if seed:
+        torch.random.manual_seed(seed)
+    n_drop = int(missing_bags_fraction * len(targets_blocks))
+    drop_idx = torch.randperm(len(targets_blocks)).to(device)[:n_drop]
+    bags_blocks = bags_blocks[~drop_idx]
+    targets_blocks = targets_blocks[~drop_idx]
 
-    paired_covariates_blocks = covariates_blocks[rdm_indices[n_drop:]]
-    paired_bags_blocks = bags_blocks[rdm_indices[n_drop:]]
-    paired_extended_bags = extended_bags[rdm_indices[n_drop:]]
-    paired_targets_blocks = targets_blocks[rdm_indices[n_drop:]]
+    # Flatten HR dataset
+    covariates_blocks = covariates_blocks.reshape(-1, covariates_blocks.size(-1))
+    extended_bags = extended_bags.reshape(-1, extended_bags.size(-1))
 
-    n_dim_individuals = covariates_blocks.size(-1)
-    n_dim_bags = bags_blocks.size(-1)
-    leftovers_covariates = covariates_blocks[rdm_indices[:n_drop]].reshape(-1, n_dim_individuals)
-    leftovers_extended_bags = extended_bags[rdm_indices[:n_drop]].reshape(-1, n_dim_bags)
-
-    def leftovers_iterator(batch_size):
-        buffer = torch.ones(len(leftovers_covariates)).to(device)
-        while True:
-            idx = buffer.multinomial(batch_size)
-            x = leftovers_covariates[idx]
-            extended_y = leftovers_extended_bags[idx]
-            yield x, extended_y
-
+    # Define stochastic batch iterator
     def batch_iterator(batch_size):
-        rdm_indices = torch.randperm(len(paired_targets_blocks)).to(device)
-        n_dim_individuals = covariates_blocks.size(-1)
-        n_dim_bags = bags_blocks.size(-1)
-        unpaired_samples_sampler = leftovers_iterator(batch_size * covariates_blocks.size(1))
+        # Define infinite sampler from HR datataset
+        def hr_iterator(batch_size):
+            buffer = torch.ones(len(covariates_blocks)).to(device)
+            while True:
+                idx = buffer.multinomial(batch_size)
+                x = covariates_blocks[idx]
+                extended_y = extended_bags[idx]
+                yield x, extended_y
+        # Define iteration loop over LR dataset
+        rdm_indices = torch.randperm(len(targets_blocks)).to(device)
+        leftovers_sampler = hr_iterator(batch_size=batch_size_cme)
         for idx in rdm_indices.split(batch_size):
-            x = paired_covariates_blocks[idx].reshape(-1, n_dim_individuals)
-            y = paired_bags_blocks[idx]
-            extended_y = paired_extended_bags[idx].reshape(-1, n_dim_bags)
-            z = paired_targets_blocks[idx]
-            leftovers_x, leftovers_extended_y = next(unpaired_samples_sampler)
-            x = torch.cat([x, leftovers_x])
-            extended_y = torch.cat([extended_y, leftovers_extended_y])
+            y = bags_blocks[idx]
+            z = targets_blocks[idx]
+            x, extended_y = next(leftovers_sampler)
             yield x, y, extended_y, z
-    ################################################################################################
-
-    # # Define stochastic batch iterator
-    # def batch_iterator(batch_size):
-    #     rdm_indices = torch.randperm(len(targets_blocks)).to(device)
-    #     n_dim_individuals = covariates_blocks.size(-1)
-    #     n_dim_bags = bags_blocks.size(-1)
-    #     for idx in rdm_indices.split(batch_size):
-    #         x = covariates_blocks[idx].reshape(-1, n_dim_individuals)
-    #         y = bags_blocks[idx]
-    #         extended_y = extended_bags[idx].reshape(-1, n_dim_bags)
-    #         z = targets_blocks[idx]
-    #         yield x, y, extended_y, z
 
     # Define variational CME process likelihood
     likelihood = CMEProcessLikelihood(use_individuals_noise=use_individuals_noise)
@@ -168,7 +148,7 @@ def train_downscaling_variational_cme_process(model, covariates_blocks, bags_blo
     # Define optimizer and elbo module
     parameters = list(model.parameters()) + list(likelihood.parameters())
     optimizer = torch.optim.Adam(params=parameters, lr=lr)
-    elbo = gpytorch.mlls.VariationalELBO(likelihood, model, num_data=len(targets_blocks), beta=beta)
+    elbo = BagVariationalELBO(likelihood, model, num_data=len(targets_blocks), beta=beta)
     if seed:
         torch.random.manual_seed(seed)
 
@@ -186,6 +166,7 @@ def train_downscaling_variational_cme_process(model, covariates_blocks, bags_blo
     for epoch in range(n_epochs):
 
         batch_bar = Bar("Batch", max=len(targets_blocks) // batch_size)
+        epoch_loss = 0
 
         for x, y, extended_y, z in batch_iterator(batch_size):
             # Zero-out remaining gradients
@@ -207,7 +188,8 @@ def train_downscaling_variational_cme_process(model, covariates_blocks, bags_blo
             loss.backward()
             optimizer.step()
 
-            batch_bar.suffix = f"ELBO {-loss.item()}"
+            epoch_loss += loss.item()
+            batch_bar.suffix = f"Running ELBO {-loss.item()}"
             batch_bar.next()
 
         # Compute posterior distribution at current epoch and store logs
@@ -216,17 +198,18 @@ def train_downscaling_variational_cme_process(model, covariates_blocks, bags_blo
                                                                             mean_shift=mean_shift,
                                                                             std_scale=std_scale)
         epoch_logs = get_epoch_logs(model, likelihood, individuals_posterior, groundtruth_field)
+        epoch_logs.update({'loss': epoch_loss / (len(targets_blocks) // batch_size)})
         logs[epoch + 1] = epoch_logs
         with open(os.path.join(dump_dir, 'running_logs.yaml'), 'w') as f:
             yaml.dump({'epoch': logs}, f)
 
         # Dump plot of posterior prediction at current epoch
         if plot and epoch % plot_every == 0:
-            _ = plot_downscaling_prediction(individuals_posterior, groundtruth_field, target_field)
+            _ = plot_downscaling_prediction(individuals_posterior, groundtruth_field, target_field, drop_idx)
             plt.savefig(os.path.join(dump_dir, f'png/epoch_{epoch}.png'))
             plt.close()
-        epoch_bar.next()
-        epoch_bar.finish()
+            epoch_bar.next()
+            epoch_bar.finish()
 
         # Empty cache if using GPU
         if torch.cuda.is_available():

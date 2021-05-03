@@ -8,7 +8,7 @@ model:
   name: 'krigging'
 
   # Number of inducing points
-  n_inducing_points: 1000
+  n_inducing_points: 800
 
   # Random seed for inducing points selection
   seed: 42
@@ -31,8 +31,8 @@ dataset:
 
   # Downsampling block size
   block_size:
-    - 17             # height
-    - 17             # width
+    - 36             # height
+    - 36             # width
 
   # Random seed for dataset generation
   seed: 42
@@ -44,11 +44,14 @@ training:
   # Name of model to use
   name: 'krigging'
 
+  # Fraction of missing bags
+  missing_bags_fraction: 0.5
+
   # Learning rate
   lr: 0.003
 
   # Number of iterations
-  n_epochs: 201
+  n_epochs: 401
 
   # Batch size
   batch_size: 8
