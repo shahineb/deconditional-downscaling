@@ -94,9 +94,9 @@ def train_downscaling_vbagg_model(model, covariates_blocks, bags_blocks, extende
     shuffled_indices = torch.randperm(len(targets_blocks)).to(device)
     keep_idx, drop_idx = shuffled_indices[n_drop:], shuffled_indices[:n_drop]
     if fill_missing:
-        lr = LinearRegression()
-        lr.fit(bags_blocks[keep_idx].cpu(), targets_blocks[keep_idx].cpu())
-        targets_blocks[drop_idx] = torch.from_numpy(lr.predict(bags_blocks[drop_idx].cpu())).to(device)
+        linreg = LinearRegression()
+        linreg.fit(bags_blocks[keep_idx].cpu(), targets_blocks[keep_idx].cpu())
+        targets_blocks[drop_idx] = torch.from_numpy(linreg.predict(bags_blocks[drop_idx].cpu())).to(device)
     else:
         covariates_blocks = covariates_blocks[keep_idx]
         bags_blocks = bags_blocks[keep_idx]
