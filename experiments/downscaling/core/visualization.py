@@ -20,9 +20,10 @@ def plot_downscaling_prediction(individuals_posterior, groundtruth_field, target
     diff_abs_max = difference.abs().max().item()
 
     # If specified, mask out dropped bags
-    buffer = target_field.values.flatten()
-    buffer[drop_idx.tolist()] = buffer.min()
-    target_field.values = buffer.reshape(*target_field.shape)
+    if drop_idx is not None:
+        buffer = target_field.values.flatten()
+        buffer[drop_idx.tolist()] = buffer.min()
+        target_field.values = buffer.reshape(*target_field.shape)
 
     # Instantiate plot and layout params
     fig, ax = plt.subplots(2, 3, figsize=(44, 18))
