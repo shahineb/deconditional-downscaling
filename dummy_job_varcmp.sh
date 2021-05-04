@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=downcloud
+#SBATCH --job-name=varw
 #SBATCH --partition=ziz-gpu
 #SBATCH --gres=gpu:2
 #NOSBATCH --nodelist=zizgpu04.cpu.stats.ox.ac.uk

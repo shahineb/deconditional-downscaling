@@ -1,12 +1,11 @@
 ################################################################################
-#   CONFIGURATIONS FOR STATISTICAL DOWNSCALING EXPERIMENT WITH VBAGG
+#   CONFIGURATIONS FOR STATISTICAL DOWNSCALING EXPERIMENT WITH KRIGGING
 ################################################################################
-
 
 # MODEL SPECIFICATIONS
 model:
   # Name of model to use
-  name: 'vbagg'
+  name: 'krigging'
 
   # Number of inducing points
   n_inducing_points: 800
@@ -43,13 +42,13 @@ dataset:
 # TRAINING
 training:
   # Name of model to use
-  name: 'vbagg'
+  name: 'krigging'
 
   # Fraction of missing bags
   missing_bags_fraction: 0.5
 
   # Fill missing values with y -> z regressor
-  fill_missing: False
+  fill_missing: True
 
   # Learning rate
   lr: 0.003

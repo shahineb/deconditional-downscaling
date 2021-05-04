@@ -47,8 +47,7 @@ def main(args, cfg):
 
     # Create model
     logging.info("Initializing model")
-    cfg['model'].update(covariates_grid=covariates_grid,
-                        bags_blocks=bags_blocks)
+    cfg['model'].update(covariates_grid=covariates_grid)
     model = build_model(cfg['model'])
     logging.info(f"{model}\n")
 

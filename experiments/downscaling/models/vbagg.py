@@ -4,7 +4,7 @@ import logging
 import torch
 import gpytorch
 import matplotlib.pyplot as plt
-from sklearn.cluster import KMeans
+from sklearn.linear_model import LinearRegression
 from progress.bar import Bar
 from models import VariationalGP, VBaggGaussianLikelihood, BagVariationalELBO, RFFKernel, MODELS, TRAINERS, PREDICTERS
 from core.visualization import plot_downscaling_prediction
@@ -41,15 +41,12 @@ def build_downscaling_vbagg_model(covariates_grid, n_inducing_points, seed, **kw
     individuals_feat_kernel = gpytorch.kernels.ScaleKernel(base_indiv_feat_kernel)
     individuals_kernel = individuals_spatial_kernel + individuals_feat_kernel
 
-    # Initialize inducing points with kmeans
-    if seed:
-        torch.random.manual_seed(seed)
+    # Initialize inducing points regularly across grid
     flattened_grid = covariates_grid.view(-1, covariates_grid.size(-1))
-    rdm_idx = torch.randperm(flattened_grid.size(0))[:n_inducing_points]
-    inducing_points = flattened_grid[rdm_idx].float()
-    # kmeans = KMeans(n_clusters=n_inducing_points, init='k-means++', random_state=seed)
-    # kmeans.fit(covariates_grid.view(-1, covariates_grid.size(-1)))
-    # inducing_points = torch.from_numpy(kmeans.cluster_centers_).float()
+    n_samples = flattened_grid.size(0)
+    step = n_samples // n_inducing_points
+    offset = (n_samples % n_inducing_points) // 2
+    inducing_points = flattened_grid[offset:n_samples - offset:step].float()
 
     # Define model
     model = VariationalGP(inducing_points=inducing_points,
@@ -59,7 +56,7 @@ def build_downscaling_vbagg_model(covariates_grid, n_inducing_points, seed, **kw
 
 
 @TRAINERS.register('vbagg')
-def train_downscaling_vbagg_model(model, covariates_blocks, bags_blocks, extended_bags, targets_blocks,
+def train_downscaling_vbagg_model(model, covariates_blocks, bags_blocks, extended_bags, targets_blocks, fill_missing,
                                   lr, n_epochs, batch_size, beta, seed, dump_dir, covariates_grid, missing_bags_fraction,
                                   groundtruth_field, target_field, plot, plot_every, **kwargs):
     """Hard-coded training script of Vbagg model for downscaling experiment
@@ -94,10 +91,16 @@ def train_downscaling_vbagg_model(model, covariates_blocks, bags_blocks, extende
     if seed:
         torch.random.manual_seed(seed)
     n_drop = int(missing_bags_fraction * len(targets_blocks))
-    drop_idx = torch.randperm(len(targets_blocks)).to(device)[:n_drop]
-    covariates_grid = covariates_grid[~drop_idx]
-    bags_blocks = bags_blocks[~drop_idx]
-    targets_blocks = targets_blocks[~drop_idx]
+    shuffled_indices = torch.randperm(len(targets_blocks)).to(device)
+    keep_idx, drop_idx = shuffled_indices[n_drop:], shuffled_indices[:n_drop]
+    if fill_missing:
+        lr = LinearRegression()
+        lr.fit(bags_blocks[keep_idx].cpu(), targets_blocks[keep_idx].cpu())
+        targets_blocks[drop_idx] = torch.from_numpy(lr.predict(bags_blocks[drop_idx].cpu())).to(device)
+    else:
+        covariates_blocks = covariates_blocks[keep_idx]
+        bags_blocks = bags_blocks[keep_idx]
+        targets_blocks = targets_blocks[keep_idx]
 
     # Define stochastic batch iterator
     def batch_iterator(batch_size):
@@ -157,6 +160,12 @@ def train_downscaling_vbagg_model(model, covariates_blocks, bags_blocks, extende
             batch_bar.suffix = f"Running ELBO {-loss.item()}"
             batch_bar.next()
 
+        # Empty cache if using GPU
+        if torch.cuda.is_available():
+            del x, y, z, bags_sizes, q
+            optimizer.zero_grad()
+            torch.cuda.empty_cache()
+
         # Compute posterior distribution at current epoch and store metrics
         individuals_posterior = predict_downscaling_vbagg_model(model=model,
                                                                 covariates_grid=covariates_grid,
@@ -170,7 +179,7 @@ def train_downscaling_vbagg_model(model, covariates_blocks, bags_blocks, extende
 
         # Dump plot of posterior prediction at current epoch
         if plot and epoch % plot_every == 0:
-            _ = plot_downscaling_prediction(individuals_posterior, groundtruth_field, target_field)
+            _ = plot_downscaling_prediction(individuals_posterior, groundtruth_field, target_field, drop_idx)
             plt.savefig(os.path.join(dump_dir, f'png/epoch_{epoch}.png'))
             plt.close()
         epoch_bar.next()

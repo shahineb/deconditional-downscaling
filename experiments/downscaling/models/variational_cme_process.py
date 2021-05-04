@@ -4,7 +4,6 @@ import logging
 import torch
 import gpytorch
 import matplotlib.pyplot as plt
-from sklearn.cluster import KMeans
 from progress.bar import Bar
 from models import VariationalCMEProcess, CMEProcessLikelihood, BagVariationalELBO, RFFKernel, MODELS, TRAINERS, PREDICTERS
 from core.visualization import plot_downscaling_prediction
@@ -53,16 +52,12 @@ def build_downscaling_variational_cme_process(covariates_grid, lbda, n_inducing_
     bag_feat_kernel = gpytorch.kernels.ScaleKernel(base_bag_feat_kernel)
     bag_kernel = bag_spatial_kernel + bag_feat_kernel
 
-    # Initialize inducing points with kmeans
-    if seed:
-        torch.random.manual_seed(seed)
+    # Initialize inducing points regularly across grid
     flattened_grid = covariates_grid.view(-1, covariates_grid.size(-1))
-    rdm_idx = torch.randperm(flattened_grid.size(0))[:n_inducing_points]
-    inducing_points = flattened_grid[rdm_idx].float()
-    # logging.info(f"K-Means selection of {n_inducing_points} inducing points with seed {seed}")
-    # kmeans = KMeans(n_clusters=n_inducing_points, init='k-means++', random_state=seed)
-    # kmeans.fit(covariates_grid.view(-1, covariates_grid.size(-1)))
-    # inducing_points = torch.from_numpy(kmeans.cluster_centers_).float()
+    n_samples = flattened_grid.size(0)
+    step = n_samples // n_inducing_points
+    offset = (n_samples % n_inducing_points) // 2
+    inducing_points = flattened_grid[offset:n_samples - offset:step].float()
 
     # Define model
     model = VariationalCMEProcess(individuals_mean=individuals_mean,
@@ -111,9 +106,10 @@ def train_downscaling_variational_cme_process(model, covariates_blocks, bags_blo
     if seed:
         torch.random.manual_seed(seed)
     n_drop = int(missing_bags_fraction * len(targets_blocks))
-    drop_idx = torch.randperm(len(targets_blocks)).to(device)[:n_drop]
-    bags_blocks = bags_blocks[~drop_idx]
-    targets_blocks = targets_blocks[~drop_idx]
+    shuffled_indices = torch.randperm(len(targets_blocks)).to(device)
+    keep_idx, drop_idx = shuffled_indices[n_drop:], shuffled_indices[:n_drop]
+    bags_blocks = bags_blocks[keep_idx]
+    targets_blocks = targets_blocks[keep_idx]
 
     # Flatten HR dataset
     covariates_blocks = covariates_blocks.reshape(-1, covariates_blocks.size(-1))

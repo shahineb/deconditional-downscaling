@@ -49,13 +49,13 @@ training:
   missing_bags_fraction: 0.5
 
   # Fill missing values with y -> z regressor
-  fill_missing: False
+  fill_missing: True
 
   # Learning rate
   lr: 0.003
 
   # Number of iterations
-  n_epochs: 401
+  n_epochs: 601
 
   # Batch size
   batch_size: 8

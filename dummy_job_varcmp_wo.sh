@@ -1,10 +1,10 @@
 #!/bin/bash
-#SBATCH --job-name=downcloud
+#SBATCH --job-name=varwo
 #SBATCH --partition=ziz-gpu
 #SBATCH --gres=gpu:2
 #NOSBATCH --nodelist=zizgpu03.cpu.stats.ox.ac.uk
 #SBATCH --time=14-00:00:00
-#SBATCH --mem=12G
+#SBATCH --mem=14G
 #SBATCH --output=/data/ziz/not-backed-up/bouabid/tmp/slurm-%A_%a.o
 #SBATCH --error=/data/ziz/not-backed-up/bouabid/tmp/slurm-%A_%a.o
 

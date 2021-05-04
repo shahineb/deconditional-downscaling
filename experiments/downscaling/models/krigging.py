@@ -4,7 +4,7 @@ import logging
 import torch
 import gpytorch
 import matplotlib.pyplot as plt
-from sklearn.cluster import KMeans
+from sklearn.linear_model import LinearRegression
 from progress.bar import Bar
 from models import VariationalGP, RFFKernel, MODELS, TRAINERS, PREDICTERS
 from core.visualization import plot_downscaling_prediction
@@ -12,7 +12,7 @@ from core.metrics import compute_metrics
 
 
 @MODELS.register('krigging')
-def build_downscaling_variational_krigging(bags_blocks, n_inducing_points, seed, **kwargs):
+def build_downscaling_variational_krigging(covariates_grid, n_inducing_points, seed, **kwargs):
     """Hard-coded initialization of ExactGP module used for downscaling experiment
 
     Args:
@@ -40,14 +40,12 @@ def build_downscaling_variational_krigging(bags_blocks, n_inducing_points, seed,
     feat_kernel = gpytorch.kernels.ScaleKernel(base_feat_kernel)
     covar_module = spatial_kernel + feat_kernel
 
-    # Initialize inducing points with kmeans
-    if seed:
-        torch.random.manual_seed(seed)
-    rdm_idx = torch.randperm(bags_blocks.size(0))[:n_inducing_points]
-    inducing_points = bags_blocks[rdm_idx].float()
-    # kmeans = KMeans(n_clusters=n_inducing_points, init='k-means++', random_state=seed)
-    # kmeans.fit(bags_blocks)
-    # inducing_points = torch.from_numpy(kmeans.cluster_centers_).float()
+    # Initialize inducing points regularly across grid
+    flattened_grid = covariates_grid.view(-1, covariates_grid.size(-1))
+    n_samples = flattened_grid.size(0)
+    step = n_samples // n_inducing_points
+    offset = (n_samples % n_inducing_points) // 2
+    inducing_points = flattened_grid[offset:n_samples - offset:step].float()
 
     # Define model
     model = VariationalGP(inducing_points=inducing_points,
@@ -58,7 +56,7 @@ def build_downscaling_variational_krigging(bags_blocks, n_inducing_points, seed,
 
 @TRAINERS.register('krigging')
 def train_downscaling_variational_krigging(model, bags_blocks, targets_blocks,
-                                           lr, n_epochs, batch_size, beta, seed, dump_dir, covariates_grid,
+                                           lr, n_epochs, batch_size, beta, seed, dump_dir, covariates_grid, fill_missing,
                                            groundtruth_field, target_field, missing_bags_fraction, plot, plot_every, **kwargs):
     """Hard-coded training script of Vbagg model for downscaling experiment
 
@@ -82,9 +80,15 @@ def train_downscaling_variational_krigging(model, bags_blocks, targets_blocks,
     if seed:
         torch.random.manual_seed(seed)
     n_drop = int(missing_bags_fraction * len(targets_blocks))
-    drop_idx = torch.randperm(len(targets_blocks)).to(device)[:n_drop]
-    bags_blocks = bags_blocks[~drop_idx]
-    targets_blocks = targets_blocks[~drop_idx]
+    shuffled_indices = torch.randperm(len(targets_blocks)).to(device)
+    keep_idx, drop_idx = shuffled_indices[n_drop:], shuffled_indices[:n_drop]
+    if fill_missing:
+        lr = LinearRegression()
+        lr.fit(bags_blocks[keep_idx].cpu(), targets_blocks[keep_idx].cpu())
+        targets_blocks[drop_idx] = torch.from_numpy(lr.predict(bags_blocks[drop_idx].cpu())).to(device)
+    else:
+        bags_blocks = bags_blocks[keep_idx]
+        targets_blocks = targets_blocks[keep_idx]
 
     # Define stochastic batch iterator
     def batch_iterator(batch_size):

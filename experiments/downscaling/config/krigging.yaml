@@ -47,6 +47,9 @@ training:
   # Fraction of missing bags
   missing_bags_fraction: 0.5
 
+  # Fill missing values with y -> z regressor
+  fill_missing: False
+
   # Learning rate
   lr: 0.003
 
