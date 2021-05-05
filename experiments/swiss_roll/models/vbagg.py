@@ -4,7 +4,7 @@ import torch
 import gpytorch
 from sklearn.cluster import KMeans
 from progress.bar import Bar
-from models import VariationalGP, VBaggGaussianLikelihood, MODELS, TRAINERS, PREDICTERS
+from models import VariationalGP, VBaggGaussianLikelihood, BagVariationalELBO, MODELS, TRAINERS, PREDICTERS
 from core.metrics import compute_metrics, compute_chunked_nll
 
 
@@ -77,7 +77,7 @@ def train_swiss_roll_vbagg_model(model, individuals, aggregate_targets, bags_siz
     # Define optimizer and elbo module
     parameters = list(model.parameters()) + list(likelihood.parameters())
     optimizer = torch.optim.Adam(params=parameters, lr=lr)
-    elbo = gpytorch.mlls.VariationalELBO(likelihood, model, num_data=len(aggregate_targets), beta=beta)
+    elbo = BagVariationalELBO(likelihood, model, num_data=len(aggregate_targets), beta=beta)
 
     # Initialize progress bar
     bar = Bar("Epoch", max=n_epochs)
@@ -107,6 +107,7 @@ def train_swiss_roll_vbagg_model(model, individuals, aggregate_targets, bags_siz
 
         # Compute epoch logs and dump
         epoch_logs = get_epoch_logs(model=model,
+                                    likelihood=likelihood,
                                     groundtruth_individuals=groundtruth_individuals,
                                     groundtruth_targets=groundtruth_targets,
                                     chunk_size=chunk_size)

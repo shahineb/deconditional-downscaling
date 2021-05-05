@@ -51,7 +51,7 @@ def plot_dataset(individuals, groundtruth_individuals, targets, aggregate_target
                groundtruth_individuals[:, 2],
                c=targets,
                cmap='Spectral',
-               s=1)
+               s=5)
     ax.set_title("Swiss roll samples from groundtruth distribution", fontsize=24)
 
     # Fourth - resulting aggregate targets mapped to bags from 2nd plot

@@ -4,7 +4,7 @@ import torch
 import gpytorch
 from sklearn.cluster import KMeans
 from progress.bar import Bar
-from models import VariationalCMEProcess, CMEProcessLikelihood, MODELS, TRAINERS, PREDICTERS
+from models import VariationalCMEProcess, CMEProcessLikelihood, BagVariationalELBO, MODELS, TRAINERS, PREDICTERS
 from core.metrics import compute_metrics, compute_chunked_nll
 
 
@@ -39,8 +39,8 @@ def build_swiss_roll_variational_cme_process(n_inducing_points, lbda,
     individuals_kernel = gpytorch.kernels.ScaleKernel(base_individuals_kernel)
 
     # Define bags kernels
-    base_bag_kernel = gpytorch.kernels.RBFKernel(ard_num_dims=3)
-    base_bag_kernel.initialize(raw_lengthscale=inv_softplus(x=1, n=3))
+    base_bag_kernel = gpytorch.kernels.RBFKernel(ard_num_dims=1)
+    base_bag_kernel.initialize(raw_lengthscale=inv_softplus(x=1, n=1))
     bag_kernel = gpytorch.kernels.ScaleKernel(base_bag_kernel)
 
     # Initialize inducing points with kmeans
@@ -92,7 +92,7 @@ def train_swiss_roll_variational_cme_process(model, individuals, bags_values, ag
     # Define optimizer and elbo module
     parameters = list(model.parameters()) + list(likelihood.parameters())
     optimizer = torch.optim.Adam(params=parameters, lr=lr)
-    elbo = gpytorch.mlls.VariationalELBO(likelihood, model, num_data=len(aggregate_targets), beta=beta)
+    elbo = BagVariationalELBO(likelihood, model, num_data=len(aggregate_targets), beta=beta)
 
     # Extend bags tensor to match individuals size
     extended_bags_values = torch.cat([x.unsqueeze(0).repeat(bag_size, 1) for (x, bag_size) in zip(bags_values, bags_sizes)])
@@ -129,6 +129,7 @@ def train_swiss_roll_variational_cme_process(model, individuals, bags_values, ag
 
         # Compute epoch logs and dump
         epoch_logs = get_epoch_logs(model=model,
+                                    likelihood=likelihood,
                                     groundtruth_individuals=groundtruth_individuals,
                                     groundtruth_targets=groundtruth_targets,
                                     chunk_size=chunk_size)
@@ -167,9 +168,7 @@ def get_epoch_logs(model, likelihood, groundtruth_individuals, groundtruth_targe
                        'k_lengthscale_y': k_lengthscales[1],
                        'k_lengthscale_z': k_lengthscales[2],
                        'l_outputscale': model.bag_kernel.outputscale.detach().item(),
-                       'l_lengthscale_x': l_lengthscales[0],
-                       'l_lengthscale_y': l_lengthscales[1],
-                       'l_lengthscale_z': l_lengthscales[2]})
+                       'l_lengthscale': l_lengthscales[0]})
     if model.noise_kernel:
         epoch_logs.update({'indiv_noise': model.noise_kernel.outputscale.detach().item()})
 

@@ -11,6 +11,18 @@ class VBaggGaussianLikelihood(GaussianLikelihood):
         y_a = Aggregate(f(B_a)) + ε  where ε ~ N(0, σ^2/bag_size)
 
     """
+    def marginal(self, function_dist, bags_sizes):
+        aggregate_mean, aggregate_covar = function_dist.mean, function_dist.lazy_covariance_matrix
+
+        # Get noise homoskedastic covariance diagonal vector sized and scale dimensions by bag sizes
+        noise_covar = self.noise_covar(shape=aggregate_mean.shape).diag()
+        noise_covar.div_(bags_sizes)
+
+        # Build joint normal distribution centered on aggregated bags evaluations corresponding bags noises
+        marginal = distributions.MultivariateNormal(mean=aggregate_mean,
+                                                    covariance_matrix=aggregate_covar.add_diag(noise_covar))
+        return marginal
+
     def forward(self, individuals_evaluations, bags_sizes):
         """Computes aggregated observations vector y = [y_1, ..., y_n]^T likelihood under
         regression model f given regression model bags evaluations f(B) = [f(B_1), ..., f(B_n)]^T
@@ -37,7 +49,7 @@ class VBaggGaussianLikelihood(GaussianLikelihood):
 
         # Build joint normal distribution centered on aggregated bags evaluations corresponding bags noises
         likelihood_distribution = distributions.base_distributions.Normal(loc=aggregated_bags_evaluations,
-                                                                          scale=noise_covar.sqrt())
+                                                                          scale=noise_covar)
 
         return likelihood_distribution
 

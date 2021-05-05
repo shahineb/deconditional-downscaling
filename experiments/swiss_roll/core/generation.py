@@ -82,6 +82,44 @@ def make_swiss_roll(n_samples, groundtruth=False, standardize=False, seed=None):
     return X, t
 
 
+def compose_bags_dataset(X, X_gt, t_gt, n_bags, noise):
+    """Composes bagged dataset by splitting into bags along height and aggregating
+        labels in distorted swiss roll
+
+    Args:
+        X (torch.Tensor): (n_samples, 3) uniform swiss roll tensor
+        X_gt (torch.Tensor): (n_samples, 3) distorted swiss roll tensor
+        t_gt (torch.Tensor): (n_samples,) distorted swiss roll labels
+        n_bags (int): Number of bags
+        noise (float): white noise variance on bags aggregate targets
+
+    Returns:
+        type: list[torch.Tensor], torch.Tensor, torch.Tensor
+
+    """
+    # Define splitting heights levels for bags
+    lowest = X_gt[:, -1].min() - np.finfo(np.float16).eps
+    highest = X_gt[:, -1].max() + np.finfo(np.float16).eps
+    height_levels = torch.linspace(lowest, highest, n_bags + 1)
+    bags_heights = list(zip(height_levels[:-1], height_levels[1:]))
+
+    # Make bags mask for both swiss rolls based on heights
+    bags_masks = [(X[:, -1] >= hmin) & (X[:, -1] < hmax) for (hmin, hmax) in bags_heights]
+    bags_masks_gt = [(X_gt[:, -1] >= hmin) & (X_gt[:, -1] < hmax) for (hmin, hmax) in bags_heights]
+
+    # Split uniform swiss roll into bags
+    x = torch.cat([X[mask] for mask in bags_masks])
+    bags_sizes = [mask.sum().item() for mask in bags_masks]
+
+    # Compute average bag heights
+    y = torch.tensor([np.mean(x) for x in bags_heights])
+
+    # Compute noisy aggregate targets from distorted swiss roll
+    z = torch.stack([t_gt[mask].mean() for mask in bags_masks_gt])
+    z.add_(noise * torch.randn_like(z))
+    return x, bags_sizes, y, z
+
+
 def aggregate_bags(X, bags_sizes):
     """Splits 3D coordinate tensor into subtensors for each bag and takes
         mean value of their coordinate as bag value

@@ -20,7 +20,7 @@ class BaggedGPPredictionStrategy(DefaultPredictionStrategy):
     """
     def __init__(self, train_individuals, bags_sizes, train_aggregate_prior_dist,
                  train_aggregate_targets, likelihood):
-        super().__init__(train_inputs=train_individuals,
+        super().__init__(train_inputs=torch.IntTensor(bags_sizes),
                          train_prior_dist=train_aggregate_prior_dist,
                          train_labels=train_aggregate_targets,
                          likelihood=likelihood)
@@ -154,9 +154,9 @@ class BaggedGPPredictionStrategy(DefaultPredictionStrategy):
             torch.zeros_like(self.train_prior_dist.mean), self.train_prior_dist.lazy_covariance_matrix
         )
         if settings.detach_test_caches.on():
-            train_cme_aggregate_covar = self.likelihood(mvn, self.train_inputs).lazy_covariance_matrix.detach()
+            train_cme_aggregate_covar = self.likelihood(mvn, self.bags_sizes).lazy_covariance_matrix.detach()
         else:
-            train_cme_aggregate_covar = self.likelihood(mvn, self.train_inputs).lazy_covariance_matrix
+            train_cme_aggregate_covar = self.likelihood(mvn, self.bags_sizes).lazy_covariance_matrix
 
         # Compute inverse model covariance X train bags to individuals covariance
         individuals_to_cme_covar = lazy.delazify(individuals_to_aggregate_covar)

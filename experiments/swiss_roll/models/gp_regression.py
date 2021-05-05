@@ -8,7 +8,7 @@ from core.metrics import compute_metrics, compute_chunked_nll
 
 
 @MODELS.register('gp_regression')
-def build_swiss_roll_gp_regressor(bags_values, aggregate_targets, **kwargs):
+def build_swiss_roll_gp_regressor(individuals, bags_sizes, aggregate_targets, **kwargs):
     """Hard-coded initialization of ExactGP module used for swiss roll experiment
 
     Args:
@@ -30,17 +30,20 @@ def build_swiss_roll_gp_regressor(bags_values, aggregate_targets, **kwargs):
     base_individuals_kernel.initialize(raw_lengthscale=inv_softplus(x=1, n=3))
     covar_module = gpytorch.kernels.ScaleKernel(base_individuals_kernel)
 
+    # Take average bags individuals as inputs
+    aggregate_individuals = torch.stack([x.mean(dim=0) for x in individuals.split(bags_sizes)])
+
     # Define model
     model = ExactGP(mean_module=mean_module,
                     covar_module=covar_module,
-                    train_x=bags_values,
+                    train_x=aggregate_individuals,
                     train_y=aggregate_targets,
                     likelihood=gpytorch.likelihoods.GaussianLikelihood())
     return model
 
 
 @TRAINERS.register('gp_regression')
-def train_swiss_roll_gp_regressor(model, bags_values, aggregate_targets, lr, n_epochs,
+def train_swiss_roll_gp_regressor(model, lr, n_epochs,
                                   groundtruth_individuals, groundtruth_targets,
                                   chunk_size, dump_dir, **kwargs):
     """Hard-coded training script of Exact GP for swiss roll experiment
@@ -56,8 +59,6 @@ def train_swiss_roll_gp_regressor(model, bags_values, aggregate_targets, lr, n_e
     """
     # Move tensors to device
     device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
-    bags_values = bags_values.to(device)
-    aggregate_targets = aggregate_targets.to(device)
     groundtruth_individuals = groundtruth_individuals.to(device)
     groundtruth_targets = groundtruth_targets.to(device)
 
@@ -79,10 +80,10 @@ def train_swiss_roll_gp_regressor(model, bags_values, aggregate_targets, lr, n_e
         optimizer.zero_grad()
 
         # Compute marginal distribution p(.|x,y)
-        output = model(bags_values)
+        output = model(model.train_inputs[0])
 
         # Evaluate -logp(z|x, y) on aggregate observations z
-        loss = -mll(output, aggregate_targets)
+        loss = -mll(output, model.train_targets)
 
         # Take gradient step
         loss.backward()

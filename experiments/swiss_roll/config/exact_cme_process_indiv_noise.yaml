@@ -17,23 +17,14 @@ model:
 
 # DATASET
 dataset:
+  # Number of points samples in swiss roll
+  n_samples: 5000
+
   # Number of bags
-  nbags: 50
-
-  # Mean size of sampled bags
-  mean_bag_size: 100
-
-  # Size standard deviation of sampled bags
-  std_bag_size: 50
-
-  # Number of samples to use in groundtruth manifold
-  n_samples_groundtruth: 10000
-
-  # Variance of noise to apply on individuals targets
-  individuals_noise_variance: 0.05
+  n_bags: 50
 
   # Variance of noise to apply on aggregate targets
-  aggregate_noise_variance: 0.05
+  noise: 0.05
 
   # Random seed for dataset generation
   seed: 42
