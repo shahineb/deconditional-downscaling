@@ -3,12 +3,12 @@ import yaml
 import torch
 import gpytorch
 from progress.bar import Bar
-from models import ExactCMEProcess, MODELS, TRAINERS, PREDICTERS
+from models import BaggedGP, VBaggGaussianLikelihood, MODELS, TRAINERS, PREDICTERS
 from core.metrics import compute_metrics, compute_chunked_nll
 
 
-@MODELS.register('exact_cme_process')
-def build_swiss_roll_exact_cme_process(individuals, bags_values, aggregate_targets, bags_sizes, lbda, use_individuals_noise, **kwargs):
+@MODELS.register('bagged_gp')
+def build_swiss_roll_bagged_gp(individuals, aggregate_targets, bags_sizes, independent_bags, **kwargs):
     """Hard-coded initialization of Exact CME Process module used for swiss roll experiment
 
     Args:
@@ -34,30 +34,21 @@ def build_swiss_roll_exact_cme_process(individuals, bags_values, aggregate_targe
     base_individuals_kernel.initialize(raw_lengthscale=inv_softplus(x=1, n=3))
     individuals_kernel = gpytorch.kernels.ScaleKernel(base_individuals_kernel)
 
-    # Define bags kernels
-    base_bag_kernel = gpytorch.kernels.RBFKernel(ard_num_dims=1)
-    base_bag_kernel.initialize(raw_lengthscale=inv_softplus(x=1, n=1))
-    bag_kernel = gpytorch.kernels.ScaleKernel(base_bag_kernel)
-
     # Define model
-    extended_train_bags = torch.cat([bag_value.repeat(bag_size, 1) for (bag_size, bag_value) in zip(bags_sizes, bags_values)]).squeeze()
-    model = ExactCMEProcess(individuals_mean=individuals_mean,
-                            individuals_kernel=individuals_kernel,
-                            bag_kernel=bag_kernel,
-                            train_individuals=individuals,
-                            train_bags=bags_values,
-                            train_aggregate_targets=aggregate_targets,
-                            extended_train_bags=extended_train_bags,
-                            lbda=lbda,
-                            use_individuals_noise=use_individuals_noise,
-                            likelihood=gpytorch.likelihoods.GaussianLikelihood())
+    model = BaggedGP(individuals_mean=individuals_mean,
+                     individuals_kernel=individuals_kernel,
+                     train_individuals=individuals,
+                     train_aggregate_targets=aggregate_targets,
+                     bags_sizes=bags_sizes,
+                     independent_bags=independent_bags,
+                     likelihood=VBaggGaussianLikelihood())
     return model
 
 
-@TRAINERS.register('exact_cme_process')
-def train_swiss_roll_exact_cme_process(model, lr, n_epochs,
-                                       groundtruth_targets,
-                                       chunk_size, dump_dir, **kwargs):
+@TRAINERS.register('bagged_gp')
+def train_swiss_roll_bagged_gp(model, lr, n_epochs,
+                               groundtruth_individuals, groundtruth_targets,
+                               chunk_size, dump_dir, **kwargs):
     """Hard-coded training script of Exact CME Process for swiss roll experiment
 
     Args:
@@ -89,18 +80,15 @@ def train_swiss_roll_exact_cme_process(model, lr, n_epochs,
         # Zero-out remaining gradients
         optimizer.zero_grad()
 
-        # Compute marginal distribution p(.|x,y)
-        output = model(model.train_bags)
+        # Compute marginal distribution p(.|x)
+        output = model(model.train_individuals, model.bags_sizes)
 
-        # Evaluate -logp(z|x, y) on aggregate observations z
-        loss = -mll(output, model.train_aggregate_targets)
+        # Evaluate -logp(z|x) on aggregate observations z
+        loss = -mll(output, model.train_aggregate_targets, model.bags_sizes)
 
         # Take gradient step
         loss.backward()
         optimizer.step()
-
-        # Update aggregation operators based on new hyperparameters
-        model.update_cme_estimate_parameters()
 
         # Update progress bar
         bar.suffix = f"NLL {loss.item()}"
@@ -108,6 +96,7 @@ def train_swiss_roll_exact_cme_process(model, lr, n_epochs,
 
         # Compute epoch logs and dump
         epoch_logs = get_epoch_logs(model=model,
+                                    groundtruth_individuals=groundtruth_individuals,
                                     groundtruth_targets=groundtruth_targets,
                                     chunk_size=chunk_size)
         epoch_logs.update(loss=loss.item())
@@ -122,50 +111,47 @@ def train_swiss_roll_exact_cme_process(model, lr, n_epochs,
     torch.save(state, os.path.join(dump_dir, 'state.pt'))
 
 
-def get_epoch_logs(model, groundtruth_targets, chunk_size):
+def get_epoch_logs(model, groundtruth_individuals, groundtruth_targets, chunk_size):
     # Compute individuals posterior on groundtruth distorted swiss roll
-    individuals_posterior = predict_swiss_roll_exact_cme_process(model=model,
-                                                                 individuals=model.train_individuals)
+    individuals_posterior = predict_swiss_roll_bagged_gp(model=model, individuals=groundtruth_individuals)
     # Compute MSE, MAE, MB
     epoch_logs = compute_metrics(individuals_posterior=individuals_posterior, groundtruth_targets=groundtruth_targets)
 
     # Compute chunked approximation of NLL
-    nll = compute_chunked_nll(groundtruth_individuals=model.train_individuals, groundtruth_targets=groundtruth_targets,
-                              chunk_size=chunk_size, model=model, predict=predict_swiss_roll_exact_cme_process)
+    nll = compute_chunked_nll(groundtruth_individuals=groundtruth_individuals, groundtruth_targets=groundtruth_targets,
+                              chunk_size=chunk_size, model=model, predict=predict_swiss_roll_bagged_gp)
     epoch_logs.update({'nll': nll})
 
     # Record model hyperparameters
     k_lengthscales = model.individuals_kernel.base_kernel.lengthscale.detach()[0].tolist()
-    l_lengthscales = model.bag_kernel.base_kernel.lengthscale.detach()[0].tolist()
     epoch_logs.update({'aggregate_noise': model.likelihood.noise.detach().item(),
                        'k_outputscale': model.individuals_kernel.outputscale.detach().item(),
                        'k_lengthscale_x': k_lengthscales[0],
                        'k_lengthscale_y': k_lengthscales[1],
-                       'k_lengthscale_z': k_lengthscales[2],
-                       'l_outputscale': model.bag_kernel.outputscale.detach().item(),
-                       'l_lengthscale': l_lengthscales[0]})
-    if model.noise_kernel:
-        epoch_logs.update({'indiv_noise': model.noise_kernel.outputscale.detach().item()})
+                       'k_lengthscale_z': k_lengthscales[2]})
 
     # Clear model cache from prediction strategy
     model._clear_cache()
     return epoch_logs
 
 
-@PREDICTERS.register('exact_cme_process')
-def predict_swiss_roll_exact_cme_process(model, individuals, **kwargs):
-    """Hard-coded prediciton of individuals posterior for Exact CME Process on
+@PREDICTERS.register('bagged_gp')
+def predict_swiss_roll_bagged_gp(model, individuals, **kwargs):
+    """Hard-coded prediciton of individuals posterior for Bagged GP model on
     swiss roll experiment
 
     Args:
-        model (ExactCMEProcess)
+        model (BaggedGP)
         individuals (torch.Tensor)
 
     Returns:
         type: gpytorch.distributions.MultivariateNormal
 
     """
+    are_bags_independents = model.independent_bags
+    model.independent_bags = False
     # Compute predictive posterior on individuals
     with torch.no_grad():
         individuals_posterior = model.predict(individuals)
+    model.independent_bags = are_bags_independents
     return individuals_posterior

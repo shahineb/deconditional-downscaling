@@ -4,7 +4,7 @@ import torch
 import gpytorch
 from sklearn.cluster import KMeans
 from progress.bar import Bar
-from models import VariationalCMEProcess, CMEProcessLikelihood, MODELS, TRAINERS, PREDICTERS
+from models import VariationalCMEProcess, CMEProcessLikelihood, BagVariationalELBO, MODELS, TRAINERS, PREDICTERS
 from core.metrics import compute_metrics, compute_chunked_nll
 
 
@@ -39,8 +39,8 @@ def build_swiss_roll_variational_cme_process(n_inducing_points, lbda,
     individuals_kernel = gpytorch.kernels.ScaleKernel(base_individuals_kernel)
 
     # Define bags kernels
-    base_bag_kernel = gpytorch.kernels.RBFKernel(ard_num_dims=3)
-    base_bag_kernel.initialize(raw_lengthscale=inv_softplus(x=1, n=3))
+    base_bag_kernel = gpytorch.kernels.RBFKernel(ard_num_dims=1)
+    base_bag_kernel.initialize(raw_lengthscale=inv_softplus(x=1, n=1))
     bag_kernel = gpytorch.kernels.ScaleKernel(base_bag_kernel)
 
     # Initialize inducing points with kmeans
@@ -60,7 +60,7 @@ def build_swiss_roll_variational_cme_process(n_inducing_points, lbda,
 
 @TRAINERS.register('variational_cme_process')
 def train_swiss_roll_variational_cme_process(model, individuals, bags_values, aggregate_targets, bags_sizes,
-                                             use_individuals_noise, lr, n_epochs, beta,
+                                             use_individuals_noise, lr, n_epochs, beta, seed,
                                              groundtruth_individuals, groundtruth_targets, chunk_size, dump_dir, **kwargs):
     """Hard-coded training script of Variational CME Process for swiss roll experiment
 
@@ -92,10 +92,10 @@ def train_swiss_roll_variational_cme_process(model, individuals, bags_values, ag
     # Define optimizer and elbo module
     parameters = list(model.parameters()) + list(likelihood.parameters())
     optimizer = torch.optim.Adam(params=parameters, lr=lr)
-    elbo = gpytorch.mlls.VariationalELBO(likelihood, model, num_data=len(aggregate_targets), beta=beta)
+    elbo = BagVariationalELBO(likelihood, model, num_data=len(aggregate_targets), beta=beta)
 
     # Extend bags tensor to match individuals size
-    extended_bags_values = torch.cat([x.unsqueeze(0).repeat(bag_size, 1) for (x, bag_size) in zip(bags_values, bags_sizes)])
+    extended_bags_values = torch.cat([bag_value.repeat(bag_size, 1) for (bag_size, bag_value) in zip(bags_sizes, bags_values)]).squeeze()
 
     # Initialize progress bar
     bar = Bar("Epoch", max=n_epochs)
@@ -103,16 +103,25 @@ def train_swiss_roll_variational_cme_process(model, individuals, bags_values, ag
     # Logs record
     logs = dict()
 
+    # Fix random seed
+    if seed:
+        torch.random.manual_seed(seed)
+
     for epoch in range(n_epochs):
+        # Shuffle individuals dataset - helps with stability
+        rdm_idx = torch.randperm(len(individuals))
+        x = individuals[rdm_idx]
+        extended_y = extended_bags_values[rdm_idx]
+
         # Zero-out remaining gradients
         optimizer.zero_grad()
 
         # Compute q(f)
-        q = model(individuals)
+        q = model(x)
 
         # Compute tensors needed for ELBO computation
         elbo_kwargs = model.get_elbo_computation_parameters(bags_values=bags_values,
-                                                            extended_bags_values=extended_bags_values)
+                                                            extended_bags_values=extended_y)
 
         # Compute negative ELBO loss
         loss = -elbo(variational_dist_f=q,
@@ -129,9 +138,11 @@ def train_swiss_roll_variational_cme_process(model, individuals, bags_values, ag
 
         # Compute epoch logs and dump
         epoch_logs = get_epoch_logs(model=model,
+                                    likelihood=likelihood,
                                     groundtruth_individuals=groundtruth_individuals,
                                     groundtruth_targets=groundtruth_targets,
                                     chunk_size=chunk_size)
+        epoch_logs.update(loss=loss.item())
         logs[epoch + 1] = epoch_logs
         with open(os.path.join(dump_dir, 'running_logs.yaml'), 'w') as f:
             yaml.dump({'epoch': logs}, f)
@@ -167,9 +178,7 @@ def get_epoch_logs(model, likelihood, groundtruth_individuals, groundtruth_targe
                        'k_lengthscale_y': k_lengthscales[1],
                        'k_lengthscale_z': k_lengthscales[2],
                        'l_outputscale': model.bag_kernel.outputscale.detach().item(),
-                       'l_lengthscale_x': l_lengthscales[0],
-                       'l_lengthscale_y': l_lengthscales[1],
-                       'l_lengthscale_z': l_lengthscales[2]})
+                       'l_lengthscale': l_lengthscales[0]})
     if model.noise_kernel:
         epoch_logs.update({'indiv_noise': model.noise_kernel.outputscale.detach().item()})
 

@@ -1,8 +1,8 @@
 import numpy as np
 import torch
-from gpytorch import lazy
 from gpytorch.models import ExactGP
 from gpytorch.distributions import MultivariateNormal
+from gpytorch.lazy import DiagLazyTensor
 from .prediction_strategies import BaggedGPPredictionStrategy
 
 
@@ -23,14 +23,14 @@ class BaggedGP(ExactGP):
 
     """
     def __init__(self, train_individuals, bags_sizes, train_aggregate_targets,
-                 individuals_mean, individuals_kernel, likelihood):
+                 individuals_mean, individuals_kernel, independent_bags, likelihood):
         # Initialize exact GP model attributes
         super().__init__(train_inputs=train_individuals,
                          train_targets=train_aggregate_targets,
                          likelihood=likelihood)
 
         # Register model tensor attributes
-        self.bags_sizes = bags_sizes
+        self.register_buffer('bags_sizes', torch.IntTensor(bags_sizes))
         self.register_buffer('train_individuals', train_individuals)
         self.register_buffer('train_aggregate_targets', train_aggregate_targets)
 
@@ -39,6 +39,12 @@ class BaggedGP(ExactGP):
         self.individuals_kernel = individuals_kernel
 
         # Initialize individuals posterior prediction strategy attribute
+        self.individuals_prediction_strategy = None
+
+        # Setup auxilliary attributes
+        self.independent_bags = independent_bags
+
+    def _clear_cache(self):
         self.individuals_prediction_strategy = None
 
     def _extract_bags_evaluations_covariances(self, joint_covar, bags_sizes):
@@ -63,6 +69,37 @@ class BaggedGP(ExactGP):
         bags_evaluations_covars = [joint_covar[i:j, i:j] for (i, j) in zip(cumulative_bags_sizes[:-1], cumulative_bags_sizes[1:])]
         return bags_evaluations_covars
 
+    def _extract_covariance_blocks(self, joint_covar, bags_sizes):
+        if self.independent_bags:
+            aggregate_covar = self._extract_covariance_blocks_independent_bags(joint_covar, bags_sizes)
+        else:
+            aggregate_covar = self._extract_covariance_blocks_non_independent_bags(joint_covar, bags_sizes)
+        return aggregate_covar
+
+    def _extract_covariance_blocks_independent_bags(self, joint_covar, bags_sizes):
+        # Extract bloc diagonal covariance matrix of each bag and aggregate
+        bags_covars = self._extract_bags_evaluations_covariances(joint_covar, bags_sizes)
+        diag = [torch.sum(block @ torch.ones(block.size(1), device=block.device)) / block.numel() for block in bags_covars]
+        aggregate_covar = DiagLazyTensor(diag=torch.stack(diag))
+        return aggregate_covar
+
+    def _extract_covariance_blocks_non_independent_bags(self, joint_covar, bags_sizes):
+        """
+        Super inefficient as implemented but there's no block reduction operations
+        natively implemented for lazy tensors
+        """
+        cumulative_bags_sizes = np.cumsum([0] + bags_sizes)
+        averaged_blocks = []
+        for (i, j) in zip(cumulative_bags_sizes[:-1], cumulative_bags_sizes[1:]):
+            row_values = []
+            for (k, l) in zip(cumulative_bags_sizes[:-1], cumulative_bags_sizes[1:]):
+                block = joint_covar[i:j, k:l]
+                block_avg = torch.sum(block @ torch.ones(block.size(1), device=block.device)) / block.numel()
+                row_values.append(block_avg)
+            averaged_blocks.append(torch.stack(row_values))
+        aggregate_covar = torch.stack(averaged_blocks)
+        return aggregate_covar
+
     def forward(self, inputs, bags_sizes):
         """Aggregate Bag GP Prior computation
 
@@ -83,8 +120,7 @@ class BaggedGP(ExactGP):
         aggregate_mean = torch.stack([x.mean() for x in mean_by_bag])
 
         # Extract bloc diagonal covariance matrix of each bag and aggregate
-        bags_covars = self._extract_bags_evaluations_covariances(covar, bags_sizes.squeeze().tolist())
-        aggregate_covar = lazy.DiagLazyTensor(diag=torch.FloatTensor([x.evaluate().mean() for x in bags_covars]))
+        aggregate_covar = self._extract_covariance_blocks(covar, bags_sizes.squeeze().tolist())
 
         # Build multivariate normal distribution of model evaluated on input samples
         prior_distribution = MultivariateNormal(mean=aggregate_mean,
@@ -94,7 +130,7 @@ class BaggedGP(ExactGP):
     def setup_individuals_prediction_strategy(self):
         """Defines computational strategy for deriving predictive posterior on individuals
         """
-        train_aggregate_prior_dist = self.forward(self.train_individuals, torch.IntTensor(self.bags_sizes))
+        train_aggregate_prior_dist = self.forward(self.train_individuals, self.bags_sizes)
         individuals_prediction_strategy_kwargs = {'train_individuals': self.train_individuals,
                                                   'bags_sizes': self.bags_sizes,
                                                   'train_aggregate_prior_dist': train_aggregate_prior_dist,
@@ -117,7 +153,7 @@ class BaggedGP(ExactGP):
         joint_covar = self.individuals_kernel(input_individuals, self.train_individuals)
 
         # Split covariance along columns by bags
-        cumulative_bags_sizes = np.cumsum([0] + self.bags_sizes)
+        cumulative_bags_sizes = np.cumsum([0] + self.bags_sizes.tolist())
         bags_covars = [joint_covar[:, i:j] for (i, j) in zip(cumulative_bags_sizes[:-1], cumulative_bags_sizes[1:])]
 
         # Average along bag dimensions and stack - trick to avoid storage of full joint covariance

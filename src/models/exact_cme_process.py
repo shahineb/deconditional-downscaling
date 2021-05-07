@@ -1,4 +1,3 @@
-import torch
 from gpytorch.models import ExactGP
 from gpytorch.distributions import MultivariateNormal
 from .cme_process import CMEProcess
@@ -24,9 +23,9 @@ class ExactCMEProcess(ExactGP, CMEProcess):
         likelihood (gpytorch.likelihoods.Likelihood): observation noise likelihood model
 
     """
-    def __init__(self, train_individuals, train_bags, train_aggregate_targets,
+    def __init__(self, train_individuals, extended_train_bags, train_bags, train_aggregate_targets,
                  individuals_mean, individuals_kernel, bag_kernel,
-                 bags_sizes, lbda, likelihood, use_individuals_noise=True, extended_train_bags=None):
+                 lbda, likelihood, use_individuals_noise=True):
 
         # Initialize exact GP model attributes
         super().__init__(train_inputs=train_bags,
@@ -36,7 +35,7 @@ class ExactCMEProcess(ExactGP, CMEProcess):
         # Register model tensor attributes
         self.register_buffer('train_individuals', train_individuals)
         self.register_buffer('train_bags', train_bags)
-        self.register_buffer('extended_train_bags', torch.cat([bag_value.repeat(bag_size, 1) for (bag_size, bag_value) in zip(bags_sizes, train_bags)]).squeeze())
+        self.register_buffer('extended_train_bags', extended_train_bags)
         self.register_buffer('train_aggregate_targets', train_aggregate_targets)
 
         # Setup model mean/kernel attributes
@@ -48,7 +47,6 @@ class ExactCMEProcess(ExactGP, CMEProcess):
             self._init_noise_kernel()
 
         # Setup model auxilliary attributes
-        self.bags_sizes = bags_sizes
         self.lbda = lbda
 
         # Initialize CME aggregate mean and covariance functions

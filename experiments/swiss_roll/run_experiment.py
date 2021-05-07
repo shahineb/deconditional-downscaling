@@ -9,9 +9,7 @@ Usage: run_experiment.py  [options] --cfg=<path_to_config> --o=<output_dir>
 
 Options:
   --cfg=<path_to_config>           Path to YAML configuration file to use.
-  --nbags=<nbags>                  Number of bags to generate.
-  --mean_bag_size=<mean_bag_size>  Mean size of sampled bags.
-  --std_bag_size=<std_bag_size>    Size standard deviation of sampled bags.
+  --n_bags=<n_bags>                Number of bags to generate.
   --o=<output_dir>                 Output directory.
   --lr=<lr>                        Learning rate.
   --beta=<beta>                    Weight of KL term in ELBO for variational formulation.
@@ -32,7 +30,7 @@ from models import build_model, train_model, predict
 
 def main(args, cfg):
     # Generate bagged swiss roll dataset
-    bags_sizes, individuals, bags_values, aggregate_targets, X_gt, t_gt = make_dataset(cfg['dataset'])
+    bags_sizes, individuals, bags_values, aggregate_targets, X, t, X_gt, t_gt = make_dataset(cfg['dataset'])
     logging.info("Generated bag swiss roll dataset\n")
 
     # Save dataset scatter plot
@@ -61,8 +59,8 @@ def main(args, cfg):
                            bags_values=bags_values,
                            aggregate_targets=aggregate_targets,
                            bags_sizes=bags_sizes,
-                           groundtruth_individuals=X_gt,
-                           groundtruth_targets=t_gt,
+                           groundtruth_individuals=X,
+                           groundtruth_targets=t,
                            chunk_size=cfg['evaluation']['chunk_size_nll'],
                            dump_dir=args['--o'])
     train_model(cfg['training'])
@@ -73,7 +71,7 @@ def main(args, cfg):
         logging.info("Plotting individuals posterior\n")
         predict_kwargs = {'name': cfg['model']['name'],
                           'model': model.eval().cpu(),
-                          'individuals': X_gt}
+                          'individuals': X}
         individuals_posterior = predict(predict_kwargs)
 
         # Dump scatter plot
@@ -81,8 +79,8 @@ def main(args, cfg):
                   filename='prediction.png',
                   output_dir=args['--o'],
                   individuals_posterior=individuals_posterior,
-                  groundtruth_individuals=X_gt,
-                  targets=t_gt)
+                  groundtruth_individuals=X,
+                  targets=t)
 
 
 def make_dataset(cfg):
@@ -95,36 +93,24 @@ def make_dataset(cfg):
         type: list[int], torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor
 
     """
-    # Sample bags sizes
-    bags_sizes = gen.sample_bags_sizes(mean_bag_size=cfg['mean_bag_size'],
-                                       std_bag_size=cfg['std_bag_size'],
-                                       n_bags=cfg['nbags'],
-                                       seed=cfg['seed'])
-    n_samples = sum(bags_sizes)
-
     # Generate groundtruth and uniform swiss rolls
-    X_gt, t_gt = gen.make_swiss_roll(n_samples=cfg['n_samples_groundtruth'],
+    X_gt, t_gt = gen.make_swiss_roll(n_samples=cfg['n_samples'],
                                      groundtruth=True,
                                      standardize=True,
                                      seed=cfg['seed'])
-    individuals, _ = gen.make_swiss_roll(n_samples=n_samples,
-                                         groundtruth=False,
-                                         standardize=True,
-                                         seed=cfg['seed'])
+    X, t = gen.make_swiss_roll(n_samples=cfg['n_samples'],
+                               groundtruth=False,
+                               standardize=True,
+                               seed=cfg['seed'])
 
-    # Aggregate individuals into bags
-    bags_values, bags_heights = gen.aggregate_bags(X=individuals,
-                                                   bags_sizes=bags_sizes)
+    # Compose into bagged dataset
+    individuals, bags_sizes, bags_values, aggregate_targets = gen.compose_bags_dataset(X=X,
+                                                                                       X_gt=X_gt,
+                                                                                       t_gt=t_gt,
+                                                                                       n_bags=cfg['n_bags'],
+                                                                                       noise=cfg['noise'])
 
-    # Compute bags aggregate target based on groundtruth
-    aggregate_targets = gen.aggregate_targets(X=X_gt,
-                                              t=t_gt,
-                                              bags_heights=bags_heights,
-                                              individuals_noise=cfg['individuals_noise_variance'],
-                                              aggregate_noise=cfg['aggregate_noise_variance'],
-                                              seed=cfg['seed'])
-
-    return bags_sizes, individuals, bags_values, aggregate_targets, X_gt, t_gt
+    return bags_sizes, individuals, bags_values, aggregate_targets, X, t, X_gt, t_gt
 
 
 def dump_plot(plotting_function, filename, output_dir, *plot_args, **plot_kwargs):
@@ -154,12 +140,8 @@ def update_cfg(cfg, args):
         type: dict
 
     """
-    if args['--nbags']:
-        cfg['dataset']['nbags'] = int(args['--nbags'])
-    if args['--mean_bag_size']:
-        cfg['dataset']['mean_bag_size'] = int(args['--mean_bag_size'])
-    if args['--std_bag_size']:
-        cfg['dataset']['std_bag_size'] = int(args['--std_bag_size'])
+    if args['--n_bags']:
+        cfg['dataset']['n_bags'] = int(args['--n_bags'])
     if args['--seed']:
         cfg['dataset']['seed'] = int(args['--seed'])
     if args['--lbda']:

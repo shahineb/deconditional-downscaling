@@ -1,18 +1,15 @@
 ################################################################################
-#   CONFIGURATIONS FOR SWISS ROLL EXPERIMENT WITH EXACT CME PROCESS
+#   CONFIGURATIONS FOR SWISS ROLL EXPERIMENT WITH BAGGED GP MODEL
 ################################################################################
 
 
 # MODEL SPECIFICATIONS
 model:
   # Name of model to use
-  name: 'exact_cme_process'
+  name: 'bagged_gp'
 
-  # CME regularization parameter
-  lbda: 0.01
-
-  # Whether to use noised individuals model or not
-  use_individuals_noise: True
+  # Whether bags are considered independent or not like in Law et al. 2018
+  independent_bags: False
 
 
 # DATASET
@@ -33,7 +30,7 @@ dataset:
 # TRAINING
 training:
   # Name of model to use
-  name: 'exact_cme_process'
+  name: 'bagged_gp'
 
   # Learning rate
   lr: 0.1
