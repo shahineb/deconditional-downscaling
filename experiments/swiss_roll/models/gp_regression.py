@@ -99,6 +99,7 @@ def train_swiss_roll_gp_regressor(model, lr, n_epochs,
                                     groundtruth_targets=groundtruth_targets,
                                     chunk_size=chunk_size)
         logs[epoch + 1] = epoch_logs
+        epoch_logs.update(loss=loss.item())
         with open(os.path.join(dump_dir, 'running_logs.yaml'), 'w') as f:
             yaml.dump({'epoch': logs}, f)
 

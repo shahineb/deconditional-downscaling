@@ -60,7 +60,7 @@ def build_swiss_roll_variational_cme_process(n_inducing_points, lbda,
 
 @TRAINERS.register('variational_cme_process')
 def train_swiss_roll_variational_cme_process(model, individuals, bags_values, aggregate_targets, bags_sizes,
-                                             use_individuals_noise, lr, n_epochs, beta,
+                                             use_individuals_noise, lr, n_epochs, beta, seed,
                                              groundtruth_individuals, groundtruth_targets, chunk_size, dump_dir, **kwargs):
     """Hard-coded training script of Variational CME Process for swiss roll experiment
 
@@ -95,7 +95,7 @@ def train_swiss_roll_variational_cme_process(model, individuals, bags_values, ag
     elbo = BagVariationalELBO(likelihood, model, num_data=len(aggregate_targets), beta=beta)
 
     # Extend bags tensor to match individuals size
-    extended_bags_values = torch.cat([x.unsqueeze(0).repeat(bag_size, 1) for (x, bag_size) in zip(bags_values, bags_sizes)])
+    extended_bags_values = torch.cat([bag_value.repeat(bag_size, 1) for (bag_size, bag_value) in zip(bags_sizes, bags_values)]).squeeze()
 
     # Initialize progress bar
     bar = Bar("Epoch", max=n_epochs)
@@ -103,16 +103,25 @@ def train_swiss_roll_variational_cme_process(model, individuals, bags_values, ag
     # Logs record
     logs = dict()
 
+    # Fix random seed
+    if seed:
+        torch.random.manual_seed(seed)
+
     for epoch in range(n_epochs):
+        # Shuffle individuals dataset - helps with stability
+        rdm_idx = torch.randperm(len(individuals))
+        x = individuals[rdm_idx]
+        extended_y = extended_bags_values[rdm_idx]
+
         # Zero-out remaining gradients
         optimizer.zero_grad()
 
         # Compute q(f)
-        q = model(individuals)
+        q = model(x)
 
         # Compute tensors needed for ELBO computation
         elbo_kwargs = model.get_elbo_computation_parameters(bags_values=bags_values,
-                                                            extended_bags_values=extended_bags_values)
+                                                            extended_bags_values=extended_y)
 
         # Compute negative ELBO loss
         loss = -elbo(variational_dist_f=q,
@@ -133,6 +142,7 @@ def train_swiss_roll_variational_cme_process(model, individuals, bags_values, ag
                                     groundtruth_individuals=groundtruth_individuals,
                                     groundtruth_targets=groundtruth_targets,
                                     chunk_size=chunk_size)
+        epoch_logs.update(loss=loss.item())
         logs[epoch + 1] = epoch_logs
         with open(os.path.join(dump_dir, 'running_logs.yaml'), 'w') as f:
             yaml.dump({'epoch': logs}, f)

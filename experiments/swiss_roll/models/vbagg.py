@@ -111,6 +111,7 @@ def train_swiss_roll_vbagg_model(model, individuals, aggregate_targets, bags_siz
                                     groundtruth_individuals=groundtruth_individuals,
                                     groundtruth_targets=groundtruth_targets,
                                     chunk_size=chunk_size)
+        epoch_logs.update(loss=loss.item())
         logs[epoch + 1] = epoch_logs
         with open(os.path.join(dump_dir, 'running_logs.yaml'), 'w') as f:
             yaml.dump({'epoch': logs}, f)

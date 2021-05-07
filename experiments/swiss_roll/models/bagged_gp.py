@@ -8,7 +8,7 @@ from core.metrics import compute_metrics, compute_chunked_nll
 
 
 @MODELS.register('bagged_gp')
-def build_swiss_roll_bagged_gp(individuals, aggregate_targets, bags_sizes, **kwargs):
+def build_swiss_roll_bagged_gp(individuals, aggregate_targets, bags_sizes, independent_bags, **kwargs):
     """Hard-coded initialization of Exact CME Process module used for swiss roll experiment
 
     Args:
@@ -40,13 +40,14 @@ def build_swiss_roll_bagged_gp(individuals, aggregate_targets, bags_sizes, **kwa
                      train_individuals=individuals,
                      train_aggregate_targets=aggregate_targets,
                      bags_sizes=bags_sizes,
+                     independent_bags=independent_bags,
                      likelihood=VBaggGaussianLikelihood())
     return model
 
 
 @TRAINERS.register('bagged_gp')
 def train_swiss_roll_bagged_gp(model, lr, n_epochs,
-                               groundtruth_targets,
+                               groundtruth_individuals, groundtruth_targets,
                                chunk_size, dump_dir, **kwargs):
     """Hard-coded training script of Exact CME Process for swiss roll experiment
 
@@ -95,8 +96,10 @@ def train_swiss_roll_bagged_gp(model, lr, n_epochs,
 
         # Compute epoch logs and dump
         epoch_logs = get_epoch_logs(model=model,
+                                    groundtruth_individuals=groundtruth_individuals,
                                     groundtruth_targets=groundtruth_targets,
                                     chunk_size=chunk_size)
+        epoch_logs.update(loss=loss.item())
         logs[epoch + 1] = epoch_logs
         with open(os.path.join(dump_dir, 'running_logs.yaml'), 'w') as f:
             yaml.dump({'epoch': logs}, f)
@@ -108,14 +111,14 @@ def train_swiss_roll_bagged_gp(model, lr, n_epochs,
     torch.save(state, os.path.join(dump_dir, 'state.pt'))
 
 
-def get_epoch_logs(model, groundtruth_targets, chunk_size):
+def get_epoch_logs(model, groundtruth_individuals, groundtruth_targets, chunk_size):
     # Compute individuals posterior on groundtruth distorted swiss roll
-    individuals_posterior = predict_swiss_roll_bagged_gp(model=model, individuals=model.train_individuals)
+    individuals_posterior = predict_swiss_roll_bagged_gp(model=model, individuals=groundtruth_individuals)
     # Compute MSE, MAE, MB
     epoch_logs = compute_metrics(individuals_posterior=individuals_posterior, groundtruth_targets=groundtruth_targets)
 
     # Compute chunked approximation of NLL
-    nll = compute_chunked_nll(groundtruth_individuals=model.train_individuals, groundtruth_targets=groundtruth_targets,
+    nll = compute_chunked_nll(groundtruth_individuals=groundtruth_individuals, groundtruth_targets=groundtruth_targets,
                               chunk_size=chunk_size, model=model, predict=predict_swiss_roll_bagged_gp)
     epoch_logs.update({'nll': nll})
 
@@ -145,7 +148,10 @@ def predict_swiss_roll_bagged_gp(model, individuals, **kwargs):
         type: gpytorch.distributions.MultivariateNormal
 
     """
+    are_bags_independents = model.independent_bags
+    model.independent_bags = False
     # Compute predictive posterior on individuals
     with torch.no_grad():
         individuals_posterior = model.predict(individuals)
+    model.independent_bags = are_bags_independents
     return individuals_posterior

@@ -19,10 +19,14 @@ def compute_metrics(individuals_posterior, groundtruth_targets):
 def compute_chunked_nll(model, predict, groundtruth_individuals, groundtruth_targets, chunk_size):
     """Compute NLL on chunks of dataset for scalability issue and averages chunks NLL
     """
-    nlls = []
-    with gpytorch.settings.fast_computations(log_prob=False, covar_root_decomposition=False):
-        for X, t in zip(groundtruth_individuals.split(chunk_size), groundtruth_targets.split(chunk_size)):
-            sub_posterior = predict(model=model, individuals=X)
-            nll = -sub_posterior.log_prob(t).div(chunk_size)
-            nlls.append(nll.item())
-    return float(np.mean(nlls))
+    try:
+        nlls = []
+        with gpytorch.settings.fast_computations(log_prob=False, covar_root_decomposition=False):
+            for X, t in zip(groundtruth_individuals.split(chunk_size), groundtruth_targets.split(chunk_size)):
+                sub_posterior = predict(model=model, individuals=X)
+                nll = -sub_posterior.log_prob(t).div(chunk_size)
+                nlls.append(nll.item())
+        output = float(np.mean(nlls))
+    except gpytorch.utils.errors.NotPSDError:
+        output = np.nan
+    return output

@@ -2,6 +2,7 @@ import numpy as np
 import torch
 from gpytorch.models import ExactGP
 from gpytorch.distributions import MultivariateNormal
+from gpytorch.lazy import DiagLazyTensor
 from .prediction_strategies import BaggedGPPredictionStrategy
 
 
@@ -22,7 +23,7 @@ class BaggedGP(ExactGP):
 
     """
     def __init__(self, train_individuals, bags_sizes, train_aggregate_targets,
-                 individuals_mean, individuals_kernel, likelihood):
+                 individuals_mean, individuals_kernel, independent_bags, likelihood):
         # Initialize exact GP model attributes
         super().__init__(train_inputs=train_individuals,
                          train_targets=train_aggregate_targets,
@@ -39,6 +40,9 @@ class BaggedGP(ExactGP):
 
         # Initialize individuals posterior prediction strategy attribute
         self.individuals_prediction_strategy = None
+
+        # Setup auxilliary attributes
+        self.independent_bags = independent_bags
 
     def _clear_cache(self):
         self.individuals_prediction_strategy = None
@@ -66,6 +70,20 @@ class BaggedGP(ExactGP):
         return bags_evaluations_covars
 
     def _extract_covariance_blocks(self, joint_covar, bags_sizes):
+        if self.independent_bags:
+            aggregate_covar = self._extract_covariance_blocks_independent_bags(joint_covar, bags_sizes)
+        else:
+            aggregate_covar = self._extract_covariance_blocks_non_independent_bags(joint_covar, bags_sizes)
+        return aggregate_covar
+
+    def _extract_covariance_blocks_independent_bags(self, joint_covar, bags_sizes):
+        # Extract bloc diagonal covariance matrix of each bag and aggregate
+        bags_covars = self._extract_bags_evaluations_covariances(joint_covar, bags_sizes)
+        diag = [torch.sum(block @ torch.ones(block.size(1), device=block.device)) / block.numel() for block in bags_covars]
+        aggregate_covar = DiagLazyTensor(diag=torch.stack(diag))
+        return aggregate_covar
+
+    def _extract_covariance_blocks_non_independent_bags(self, joint_covar, bags_sizes):
         """
         Super inefficient as implemented but there's no block reduction operations
         natively implemented for lazy tensors

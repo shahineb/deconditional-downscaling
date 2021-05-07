@@ -37,14 +37,13 @@ training:
   name: 'vbagg'
 
   # Learning rate
-  lr: 0.005
+  lr: 0.05
 
   # Number of iterations
-  n_epochs: 400
+  n_epochs: 100
 
   # Weight of KL term in ELBO
   beta: 1
-  #beta: 0.1
 
 
 

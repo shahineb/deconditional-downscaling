@@ -46,14 +46,14 @@ training:
   use_individuals_noise: True
 
   # Learning rate
-  lr: 0.005
+  lr: 0.05
 
   # Number of iterations
   n_epochs: 400
 
   # Weight of KL term in ELBO
-  #beta: 0.001
   beta: 1
+
 
 
 # EVALUATION

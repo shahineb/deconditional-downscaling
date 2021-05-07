@@ -8,6 +8,9 @@ model:
   # Name of model to use
   name: 'bagged_gp'
 
+  # Whether bags are considered independent or not like in Law et al. 2018
+  independent_bags: False
+
 
 # DATASET
 dataset:
@@ -30,7 +33,7 @@ training:
   name: 'bagged_gp'
 
   # Learning rate
-  lr: 0.05
+  lr: 0.1
 
   # Number of iterations
   n_epochs: 100
