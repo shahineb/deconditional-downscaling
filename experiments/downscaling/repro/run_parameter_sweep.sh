@@ -11,7 +11,8 @@ VBAGG_OUTDIR=experiments/downscaling/data/experiment_outputs/parameter_sweep/vba
 KRIGGING_OUTDIR=experiments/downscaling/data/experiment_outputs/parameter_sweep/krigging
 
 # Define parameter grid to parse onto
-VALUES_BETA=(1 1e-1 1e-2 1e-3 1e-4 1e-5 1e-6)
+VALUES_LR=(3e-2 3e-3 3e-4)
+VALUES_BETA=(1e-1 1e-2 1e-3)
 VALUES_LBDA=(1e-1 1e-2 1e-3 1e-4 1e-5)
 
 
@@ -48,21 +49,27 @@ do
   --beta=$beta
 done
 
+for lr in ${VALUES_LR[@]}
+do
+  output_dir="lr_"$lr
+  python experiments/downscaling/run_experiment.py --cfg=$VARIATIONAL_CME_INDIV_NOISE_CFG --o=$VARIATIONAL_CME_INDIV_NOISE_OUTDIR/$output_dir \
+  --lr=$lr
+done
 
 
-# # VbAgg
-# for beta in ${VALUES_BETA[@]}
-# do
-#   output_dir="beta_"$beta
-#   python experiments/downscaling/run_experiment.py --cfg=$VBAGG_CFG --o=$VBAGG_OUTDIR/$output_dir \
-#   --beta=$beta
-# done
-#
-#
-# # Krigging
-# for beta in ${VALUES_BETA[@]}
-# do
-#   output_dir="beta_"$beta
-#   python experiments/downscaling/run_experiment.py --cfg=$KRIGGING_CFG --o=$KRIGGING_OUTDIR/$output_dir \
-#   --beta=$beta
-# done
+# VbAgg
+for beta in ${VALUES_BETA[@]}
+do
+  output_dir="beta_"$beta
+  python experiments/downscaling/run_experiment.py --cfg=$VBAGG_CFG --o=$VBAGG_OUTDIR/$output_dir \
+  --beta=$beta
+done
+
+
+# Krigging
+for beta in ${VALUES_BETA[@]}
+do
+  output_dir="beta_"$beta
+  python experiments/downscaling/run_experiment.py --cfg=$KRIGGING_CFG --o=$KRIGGING_OUTDIR/$output_dir \
+  --beta=$beta
+done

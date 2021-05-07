@@ -25,6 +25,5 @@ def predict(cfg):
 
 from .exact_cme_process import *
 from .variational_cme_process import *
-from .linear_interpolation import *
 from .vbagg import *
 from .gp_regression import *

@@ -2,7 +2,7 @@ import torch
 from gpytorch.models import ExactGP
 from gpytorch.distributions import MultivariateNormal
 from .cme_process import CMEProcess
-from .cme_prediction_strategy import ExactCMEPredictionStrategy
+from .prediction_strategies import ExactCMEPredictionStrategy
 
 
 class ExactCMEProcess(ExactGP, CMEProcess):
