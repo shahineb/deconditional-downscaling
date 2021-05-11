@@ -15,8 +15,7 @@ class VBaggGaussianLikelihood(GaussianLikelihood):
         aggregate_mean, aggregate_covar = function_dist.mean, function_dist.lazy_covariance_matrix
 
         # Get noise homoskedastic covariance diagonal vector sized and scale dimensions by bag sizes
-        noise_covar = self.noise_covar(shape=aggregate_mean.shape).diag()
-        noise_covar.div_(bags_sizes)
+        noise_covar = self.noise_covar(shape=aggregate_mean.shape).diag().div(bags_sizes)
 
         # Build joint normal distribution centered on aggregated bags evaluations corresponding bags noises
         marginal = distributions.MultivariateNormal(mean=aggregate_mean,
@@ -44,8 +43,7 @@ class VBaggGaussianLikelihood(GaussianLikelihood):
         aggregated_bags_evaluations = torch.stack([x.mean() for x in individuals_evaluations_by_bag])
 
         # Get noise homoskedastic covariance diagonal vector sized and scale dimensions by bag sizes
-        noise_covar = self.noise_covar(shape=aggregated_bags_evaluations.shape).diag()
-        noise_covar.div_(bags_sizes)
+        noise_covar = self.noise_covar(shape=aggregated_bags_evaluations.shape).diag().div(bags_sizes)
 
         # Build joint normal distribution centered on aggregated bags evaluations corresponding bags noises
         likelihood_distribution = distributions.base_distributions.Normal(loc=aggregated_bags_evaluations,

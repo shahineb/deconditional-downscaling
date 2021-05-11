@@ -10,6 +10,7 @@ Usage: run_experiment.py  [options] --cfg=<path_to_config> --o=<output_dir>
 Options:
   --cfg=<path_to_config>           Path to YAML configuration file to use.
   --o=<output_dir>                 Output directory.
+  --device=<device_index>          Index of GPU to use [default: 0].
   --block_size=<block_size>        Dimension of block to use for groundtruth downsampling.
   --batch_size=<batch_size>        Batch size used for stochastic optimization scheme
   --lr=<lr>                        Learning rate
@@ -61,6 +62,7 @@ def main(args, cfg):
                            covariates_grid=covariates_grid,
                            groundtruth_field=groundtruth_field,
                            target_field=raw_aggregate_target_field,
+                           device_idx=args['--device'],
                            plot=args['--plot'],
                            dump_dir=args['--o'])
     train_model(cfg['training'])

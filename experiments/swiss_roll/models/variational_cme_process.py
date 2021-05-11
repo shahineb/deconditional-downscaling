@@ -61,7 +61,7 @@ def build_swiss_roll_variational_cme_process(n_inducing_points, lbda,
 @TRAINERS.register('variational_cme_process')
 def train_swiss_roll_variational_cme_process(model, individuals, bags_values, aggregate_targets, bags_sizes,
                                              use_individuals_noise, lr, n_epochs, beta, seed,
-                                             groundtruth_individuals, groundtruth_targets, chunk_size, dump_dir, **kwargs):
+                                             groundtruth_individuals, groundtruth_targets, device_idx, chunk_size, dump_dir, **kwargs):
     """Hard-coded training script of Variational CME Process for swiss roll experiment
 
     Args:
@@ -75,7 +75,7 @@ def train_swiss_roll_variational_cme_process(model, individuals, bags_values, ag
 
     """
     # Transfer on device
-    device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
+    device = torch.device(f"cuda:{device_idx}") if torch.cuda.is_available() else torch.device("cpu")
     individuals = individuals.to(device)
     bags_values = bags_values.to(device)
     aggregate_targets = aggregate_targets.to(device)

@@ -56,7 +56,7 @@ def build_downscaling_variational_krigging(covariates_grid, n_inducing_points, s
 
 @TRAINERS.register('krigging')
 def train_downscaling_variational_krigging(model, bags_blocks, targets_blocks,
-                                           lr, n_epochs, batch_size, beta, seed, dump_dir, covariates_grid, fill_missing,
+                                           lr, n_epochs, batch_size, beta, seed, device_idx, dump_dir, covariates_grid, fill_missing,
                                            groundtruth_field, target_field, missing_bags_fraction, plot, plot_every, **kwargs):
     """Hard-coded training script of Vbagg model for downscaling experiment
 
@@ -71,7 +71,7 @@ def train_downscaling_variational_krigging(model, bags_blocks, targets_blocks,
 
     """
     # Transfer on device
-    device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
+    device = torch.device(f"cuda:{device_idx}") if torch.cuda.is_available() else torch.device("cpu")
     covariates_grid = covariates_grid.to(device)
     bags_blocks = bags_blocks.to(device)
     targets_blocks = targets_blocks.to(device)
@@ -165,8 +165,9 @@ def train_downscaling_variational_krigging(model, bags_blocks, targets_blocks,
 
         # Empty cache if using GPU
         if torch.cuda.is_available():
-            del individuals_posterior
-            torch.cuda.empty_cache()
+            with torch.cuda.device(f"cuda:{device_idx}"):
+                del individuals_posterior
+                torch.cuda.empty_cache()
 
     # Save model training state
     state = {'epoch': n_epochs,

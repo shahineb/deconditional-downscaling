@@ -49,10 +49,13 @@ training:
   lr: 0.05
 
   # Number of iterations
-  n_epochs: 400
+  n_epochs: 200
 
   # Weight of KL term in ELBO
   beta: 1
+
+  # Seed for dataset shuffling
+  seed: 42
 
 
 

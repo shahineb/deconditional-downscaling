@@ -57,7 +57,7 @@ def build_swiss_roll_exact_cme_process(individuals, bags_values, aggregate_targe
 @TRAINERS.register('exact_cme_process')
 def train_swiss_roll_exact_cme_process(model, lr, n_epochs,
                                        groundtruth_targets,
-                                       chunk_size, dump_dir, **kwargs):
+                                       chunk_size, device_idx, dump_dir, **kwargs):
     """Hard-coded training script of Exact CME Process for swiss roll experiment
 
     Args:
@@ -67,7 +67,7 @@ def train_swiss_roll_exact_cme_process(model, lr, n_epochs,
 
     """
     # Move to device
-    device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
+    device = torch.device(f"cuda:{device_idx}") if torch.cuda.is_available() else torch.device("cpu")
     model = model.to(device)
     groundtruth_targets = groundtruth_targets.to(device)
 

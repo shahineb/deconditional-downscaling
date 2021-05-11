@@ -47,7 +47,7 @@ def build_swiss_roll_vbagg_model(individuals, n_inducing_points, seed, **kwargs)
 @TRAINERS.register('vbagg')
 def train_swiss_roll_vbagg_model(model, individuals, aggregate_targets, bags_sizes,
                                  groundtruth_individuals, groundtruth_targets, chunk_size,
-                                 lr, n_epochs, beta, dump_dir, **kwargs):
+                                 device_idx, lr, n_epochs, beta, dump_dir, **kwargs):
     """Hard-coded training script of Vbagg model for swiss roll experiment
 
     Args:
@@ -61,7 +61,7 @@ def train_swiss_roll_vbagg_model(model, individuals, aggregate_targets, bags_siz
 
     """
     # Transfer tensors on device
-    device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
+    device = torch.device(f"cuda:{device_idx}") if torch.cuda.is_available() else torch.device("cpu")
     individuals = individuals.to(device)
     aggregate_targets = aggregate_targets.to(device)
     groundtruth_individuals = groundtruth_individuals.to(device)

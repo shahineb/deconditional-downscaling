@@ -19,15 +19,15 @@ VBAGG_OUTDIR=experiments/swiss_roll/data/experiment_outputs/seeds/vbagg
 GP_REGRESSION_OUTDIR=experiments/swiss_roll/data/experiment_outputs/seeds/gp_regression
 
 # Run experiments for multiple seeds
-for SEED in 3 5 7 13 15 19 23 31 37 41 42 59 61 67 71 73 79 83 97 101 ;
+for SEED in 2 3 5 7 9 11 17 19 23 29 31 37 41 42;
 do
   DIRNAME=seed_$SEED
-  python experiments/swiss_roll/run_experiment.py --seed=$SEED --cfg=$EXACT_CME_CFG --o=$EXACT_CME_OUTDIR/$DIRNAME
-  python experiments/swiss_roll/run_experiment.py --seed=$SEED --cfg=$EXACT_CME_INDIV_NOISE_CFG --o=$EXACT_CME_INDIV_NOISE_OUTDIR/$DIRNAME
-  python experiments/swiss_roll/run_experiment.py --seed=$SEED --cfg=$BAGGED_GP_CFG --o=$BAGGED_GP_OUTDIR/$DIRNAME
-  python experiments/swiss_roll/run_experiment.py --seed=$SEED --cfg=$INDEPENDENT_BAGGED_GP_CFG --o=$INDEPENDENT_BAGGED_GP_OUTDIR/$DIRNAME
-  python experiments/swiss_roll/run_experiment.py --seed=$SEED --cfg=$VARIATIONAL_CME_CFG --o=$VARIATIONAL_CME_OUTDIR/$DIRNAME
-  python experiments/swiss_roll/run_experiment.py --seed=$SEED --cfg=$VARIATIONAL_CME_INDIV_NOISE_CFG --o=$VARIATIONAL_CME_INDIV_NOISE_OUTDIR/$DIRNAME
-  python experiments/swiss_roll/run_experiment.py --seed=$SEED --cfg=$VBAGG_CFG --o=$VBAGG_OUTDIR/$DIRNAME
-  python experiments/swiss_roll/run_experiment.py --seed=$SEED --cfg=$GP_REGRESSION_CFG --o=$GP_REGRESSION_OUTDIR/$DIRNAME
+  # python experiments/swiss_roll/run_experiment.py --seed=$SEED --cfg=$EXACT_CME_CFG --o=$EXACT_CME_OUTDIR/$DIRNAME
+  # python experiments/swiss_roll/run_experiment.py --seed=$SEED --cfg=$EXACT_CME_INDIV_NOISE_CFG --o=$EXACT_CME_INDIV_NOISE_OUTDIR/$DIRNAME
+  # python experiments/swiss_roll/run_experiment.py --seed=$SEED --cfg=$BAGGED_GP_CFG --o=$BAGGED_GP_OUTDIR/$DIRNAME
+  python experiments/swiss_roll/run_experiment.py --seed=$SEED --cfg=$INDEPENDENT_BAGGED_GP_CFG --o=$INDEPENDENT_BAGGED_GP_OUTDIR/$DIRNAME --device=3
+  # python experiments/swiss_roll/run_experiment.py --seed=$SEED --cfg=$VARIATIONAL_CME_CFG --o=$VARIATIONAL_CME_OUTDIR/$DIRNAME
+  # python experiments/swiss_roll/run_experiment.py --seed=$SEED --cfg=$VARIATIONAL_CME_INDIV_NOISE_CFG --o=$VARIATIONAL_CME_INDIV_NOISE_OUTDIR/$DIRNAME
+  # python experiments/swiss_roll/run_experiment.py --seed=$SEED --cfg=$VBAGG_CFG --o=$VBAGG_OUTDIR/$DIRNAME
+  # python experiments/swiss_roll/run_experiment.py --seed=$SEED --cfg=$GP_REGRESSION_CFG --o=$GP_REGRESSION_OUTDIR/$DIRNAME
 done

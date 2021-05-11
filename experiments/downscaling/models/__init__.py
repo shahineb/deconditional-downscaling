@@ -4,7 +4,7 @@ import sys
 base_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "../../..")
 sys.path.append(base_dir)
 
-from src.models import VariationalGP, VariationalCMEProcess
+from src.models import ExactGP, VariationalGP, VariationalCMEProcess
 from src.likelihoods import CMEProcessLikelihood, VBaggGaussianLikelihood
 from src.mlls import BagVariationalELBO
 from src.kernels import RFFKernel

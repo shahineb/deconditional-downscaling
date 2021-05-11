@@ -1,5 +1,6 @@
 import os
 import yaml
+import numpy as np
 import torch
 import gpytorch
 from progress.bar import Bar
@@ -48,7 +49,7 @@ def build_swiss_roll_bagged_gp(individuals, aggregate_targets, bags_sizes, indep
 @TRAINERS.register('bagged_gp')
 def train_swiss_roll_bagged_gp(model, lr, n_epochs,
                                groundtruth_individuals, groundtruth_targets,
-                               chunk_size, dump_dir, **kwargs):
+                               chunk_size, device_idx, dump_dir, **kwargs):
     """Hard-coded training script of Exact CME Process for swiss roll experiment
 
     Args:
@@ -58,8 +59,9 @@ def train_swiss_roll_bagged_gp(model, lr, n_epochs,
 
     """
     # Move to device
-    device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
+    device = torch.device(f"cuda:{device_idx}") if torch.cuda.is_available() else torch.device("cpu")
     model = model.to(device)
+    groundtruth_individuals = groundtruth_individuals.to(device)
     groundtruth_targets = groundtruth_targets.to(device)
 
     # Set model in training mode
@@ -118,8 +120,11 @@ def get_epoch_logs(model, groundtruth_individuals, groundtruth_targets, chunk_si
     epoch_logs = compute_metrics(individuals_posterior=individuals_posterior, groundtruth_targets=groundtruth_targets)
 
     # Compute chunked approximation of NLL
-    nll = compute_chunked_nll(groundtruth_individuals=groundtruth_individuals, groundtruth_targets=groundtruth_targets,
-                              chunk_size=chunk_size, model=model, predict=predict_swiss_roll_bagged_gp)
+    try:
+        nll = compute_chunked_nll(groundtruth_individuals=groundtruth_individuals, groundtruth_targets=groundtruth_targets,
+                                  chunk_size=chunk_size, model=model, predict=predict_swiss_roll_bagged_gp)
+    except gpytorch.utils.errors.NotPSDError:
+        nll = np.nan
     epoch_logs.update({'nll': nll})
 
     # Record model hyperparameters
@@ -148,10 +153,10 @@ def predict_swiss_roll_bagged_gp(model, individuals, **kwargs):
         type: gpytorch.distributions.MultivariateNormal
 
     """
-    are_bags_independents = model.independent_bags
-    model.independent_bags = False
+    # are_bags_independents = model.independent_bags
+    # model.independent_bags = False
     # Compute predictive posterior on individuals
     with torch.no_grad():
         individuals_posterior = model.predict(individuals)
-    model.independent_bags = are_bags_independents
+    # model.independent_bags = are_bags_independents
     return individuals_posterior

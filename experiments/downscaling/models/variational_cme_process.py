@@ -11,7 +11,7 @@ from core.metrics import compute_metrics
 
 
 @MODELS.register('variational_cme_process')
-def build_downscaling_variational_cme_process(covariates_grid, lbda, n_inducing_points, use_individuals_noise, seed, **kwargs):
+def build_downscaling_variational_cme_process(covariates_grid, lbda, n_inducing_points, use_individuals_noise, **kwargs):
     """Hard-coded initialization of Variational CME Process module used for downscaling experiment
 
     Args:
@@ -71,7 +71,7 @@ def build_downscaling_variational_cme_process(covariates_grid, lbda, n_inducing_
 
 @TRAINERS.register('variational_cme_process')
 def train_downscaling_variational_cme_process(model, covariates_blocks, bags_blocks, extended_bags, targets_blocks, batch_size_cme,
-                                              lr, n_epochs, batch_size, beta, seed, dump_dir, covariates_grid, missing_bags_fraction,
+                                              lr, n_epochs, batch_size, beta, seed, dump_dir, device_idx, covariates_grid, missing_bags_fraction,
                                               use_individuals_noise, groundtruth_field, target_field, plot, plot_every, **kwargs):
     """Hard-coded training script of Exact CME Process for downscaling experiment
 
@@ -95,7 +95,7 @@ def train_downscaling_variational_cme_process(model, covariates_blocks, bags_blo
 
     """
     # Transfer on device
-    device = torch.device("cuda:0") if torch.cuda.is_available() else torch.device("cpu")
+    device = torch.device(f"cuda:{device_idx}") if torch.cuda.is_available() else torch.device("cpu")
     covariates_grid = covariates_grid.to(device)
     covariates_blocks = covariates_blocks.to(device)
     bags_blocks = bags_blocks.to(device)
@@ -209,8 +209,9 @@ def train_downscaling_variational_cme_process(model, covariates_blocks, bags_blo
 
         # Empty cache if using GPU
         if torch.cuda.is_available():
-            del individuals_posterior
-            torch.cuda.empty_cache()
+            with torch.cuda.device(f"cuda:{device_idx}"):
+                del individuals_posterior
+                torch.cuda.empty_cache()
 
     # Save model training state
     state = {'epoch': n_epochs,

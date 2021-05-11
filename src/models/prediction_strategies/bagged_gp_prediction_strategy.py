@@ -20,7 +20,7 @@ class BaggedGPPredictionStrategy(DefaultPredictionStrategy):
     """
     def __init__(self, train_individuals, bags_sizes, train_aggregate_prior_dist,
                  train_aggregate_targets, likelihood):
-        super().__init__(train_inputs=torch.IntTensor(bags_sizes),
+        super().__init__(train_inputs=bags_sizes,
                          train_prior_dist=train_aggregate_prior_dist,
                          train_labels=train_aggregate_targets,
                          likelihood=likelihood)

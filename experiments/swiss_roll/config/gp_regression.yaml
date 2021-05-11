@@ -32,7 +32,7 @@ training:
   lr: 0.1
 
   # Number of iterations
-  n_epochs: 400
+  n_epochs: 60
 
 
 # EVALUATION

@@ -9,8 +9,9 @@ Usage: run_experiment.py  [options] --cfg=<path_to_config> --o=<output_dir>
 
 Options:
   --cfg=<path_to_config>           Path to YAML configuration file to use.
-  --n_bags=<n_bags>                Number of bags to generate.
   --o=<output_dir>                 Output directory.
+  --device=<device_index>          Index of GPU to use [default: 0].
+  --n_bags=<n_bags>                Number of bags to generate.
   --lr=<lr>                        Learning rate.
   --beta=<beta>                    Weight of KL term in ELBO for variational formulation.
   --lbda=<lbda>                    CME inverse regularization term.
@@ -62,6 +63,7 @@ def main(args, cfg):
                            groundtruth_individuals=X,
                            groundtruth_targets=t,
                            chunk_size=cfg['evaluation']['chunk_size_nll'],
+                           device_idx=args['--device'],
                            dump_dir=args['--o'])
     train_model(cfg['training'])
 
