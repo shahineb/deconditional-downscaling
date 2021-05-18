@@ -19,7 +19,7 @@ def load_fields(files_paths, date=None):
     return fields
 
 
-def preprocess_fields(fields, covariate_fields_names, target_field_name, block_size):
+def preprocess_fields(fields, covariate_fields_names, bags_fields_names, target_field_name, block_size):
     """
         (1): Standardizes all fields
         (2): Downsamples target field to target resolution
@@ -39,6 +39,13 @@ def preprocess_fields(fields, covariate_fields_names, target_field_name, block_s
     raw_aggregate_target_field = coarsen(field=fields[target_field_name], block_size=block_size)
     aggregate_target_field = standardize(field=raw_aggregate_target_field)
 
+    # Coarsen and standardize bags fields
+    bags_fields = dict()
+    for key in bags_fields_names:
+        coarsened_field = coarsen(field=fields[key], block_size=block_size)
+        standardized_field = standardize(field=coarsened_field)
+        bags_fields.update({key: standardized_field})
+
     # Standardize and trim covariates fields to match dimensions of target field
     covariates_fields = dict()
     for key in covariate_fields_names:
@@ -46,10 +53,10 @@ def preprocess_fields(fields, covariate_fields_names, target_field_name, block_s
         trimmed_field = trim(field=standardized_field, block_size=block_size)
         covariates_fields.update({key: trimmed_field})
 
-    return covariates_fields, aggregate_target_field, raw_aggregate_target_field
+    return covariates_fields, bags_fields, aggregate_target_field, raw_aggregate_target_field
 
 
-def make_tensor_dataset(covariates_fields, aggregate_target_field, block_size):
+def make_tensor_dataset(covariates_fields, bags_fields, aggregate_target_field, block_size):
     """Converts covariates and target fields into bagged pytorch tensors
 
     Args:
@@ -62,7 +69,8 @@ def make_tensor_dataset(covariates_fields, aggregate_target_field, block_size):
 
     """
     covariates_grid = make_covariates_grid_tensor(list(covariates_fields.values()))
-    bags_grid = make_lat_lon_grid_tensor(aggregate_target_field)
+    # bags_grid = torch.cat([torch.from_numpy(x.values).unsqueeze(-1) for x in bags_fields.values()], dim=-1)
+    bags_grid = make_covariates_grid_tensor(list(bags_fields.values()))
     target_grid = torch.from_numpy(aggregate_target_field.values)
     covariates_blocks, bags_blocks, extended_bags, targets_blocks = make_bagged_dataset(covariates_grid=covariates_grid,
                                                                                         bags_grid=bags_grid,
@@ -198,8 +206,7 @@ def make_bagged_dataset(covariates_grid, bags_grid, target_grid, block_size):
                                    for x in covariates_grid.split(block_width)]).view(-1, bag_size, ndim)
 
     # Ravel bags cells and add mean covariates values of each bag as features
-    bags_blocks = torch.cat([bags_grid.view(-1, bags_grid.size(-1)),
-                             covariates_blocks[..., 2:].mean(dim=1)], dim=-1)
+    bags_blocks = bags_grid.view(-1, bags_grid.size(-1))
 
     # Repeat bags values to match bags sizes
     extended_bags = bags_blocks.unsqueeze(1).repeat((1, bag_size, 1))

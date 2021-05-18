@@ -2,39 +2,18 @@ import os
 import sys
 import numpy as np
 import torch
+import gpytorch
+from progress.bar import Bar
 
 base_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "../../..")
 sys.path.append(base_dir)
 
+from src.models import ExactGP
 from src.utils import setseed
 
 
-@setseed('numpy')
-def sample_bags_sizes(mean_bag_size, std_bag_size, n_bags, seed=None):
-    """Draws random list of bags sizes from negative binomial distribution
-        with mean and std specified by given mean bag size and std of bags sizes
-
-    Args:
-        mean_bag_size (int): mean of negative binomial
-        std_bag_size (int): std of negative binomial
-        n_bags (int): number of samples to draw
-        seed (int): random seed
-
-    Returns:
-        type: list[int]
-
-    """
-    # Compute probability of success and number of success parameters
-    p = mean_bag_size / (std_bag_size**2)
-    n = p * mean_bag_size / (1 - p)
-
-    # Draw list of bags sizes
-    bags_sizes = np.random.negative_binomial(n, p, size=n_bags).tolist()
-    return bags_sizes
-
-
 @setseed('torch')
-def make_swiss_roll(n_samples, groundtruth=False, standardize=False, seed=None):
+def make_swiss_roll(n_samples, standardize=False, seed=None):
     """Draws random tensors of samples location on a swiss roll manifold following
         `sklearn.datasets.make_swiss_roll` implementation.
 
@@ -63,10 +42,6 @@ def make_swiss_roll(n_samples, groundtruth=False, standardize=False, seed=None):
     z = t * torch.sin(t)
     y = 21 * torch.rand_like(samples)
 
-    # Height-wise distortion of distribution for groundtruth roll
-    if groundtruth:
-        y.mul_(torch.sin(0.25 * np.pi * z))
-
     # Stack 3D coordinates together
     X = torch.stack([x, y, z], dim=-1).float()
     t = t.float()
@@ -82,7 +57,8 @@ def make_swiss_roll(n_samples, groundtruth=False, standardize=False, seed=None):
     return X, t
 
 
-def compose_bags_dataset(X, X_gt, t_gt, n_bags, noise):
+@setseed('torch')
+def compose_bags_dataset(X, t, n_bags, noise, seed=None):
     """Composes bagged dataset by splitting into bags along height and aggregating
         labels in distorted swiss roll
 
@@ -94,81 +70,135 @@ def compose_bags_dataset(X, X_gt, t_gt, n_bags, noise):
         noise (float): white noise variance on bags aggregate targets
 
     Returns:
-        type: list[torch.Tensor], torch.Tensor, torch.Tensor
+        type: torch.Tensor, torch.Tensor, list[torch.Tensor], torch.Tensor, torch.Tensor
 
     """
     # Define splitting heights levels for bags
-    lowest = X_gt[:, -1].min() - np.finfo(np.float16).eps
-    highest = X_gt[:, -1].max() + np.finfo(np.float16).eps
+    lowest = X[:, -1].min() - np.finfo(np.float16).eps
+    highest = X[:, -1].max() + np.finfo(np.float16).eps
     height_levels = torch.linspace(lowest, highest, n_bags + 1)
     bags_heights = list(zip(height_levels[:-1], height_levels[1:]))
 
     # Make bags mask for both swiss rolls based on heights
     bags_masks = [(X[:, -1] >= hmin) & (X[:, -1] < hmax) for (hmin, hmax) in bags_heights]
-    bags_masks_gt = [(X_gt[:, -1] >= hmin) & (X_gt[:, -1] < hmax) for (hmin, hmax) in bags_heights]
-
-    # Split uniform swiss roll into bags
-    x = torch.cat([X[mask] for mask in bags_masks])
-    bags_sizes = [mask.sum().item() for mask in bags_masks]
 
     # Compute average bag heights
     y = torch.tensor([np.mean(x) for x in bags_heights])
 
     # Compute noisy aggregate targets from distorted swiss roll
-    z = torch.stack([t_gt[mask].mean() for mask in bags_masks_gt])
+    z = torch.stack([t[mask].mean() for mask in bags_masks])
     z.add_(noise * torch.randn_like(z))
-    return x, bags_sizes, y, z
 
+    # Split uniform swiss roll into bags
+    x = torch.cat([X[mask] for mask in bags_masks])
+    bags_sizes = [mask.sum().item() for mask in bags_masks]
 
-def aggregate_bags(X, bags_sizes):
-    """Splits 3D coordinate tensor into subtensors for each bag and takes
-        mean value of their coordinate as bag value
-
-    Args:
-        X (torch.Tensor): (n_samples, 3) tensor
-        bags_sizes (list[int]): sizes of bags s.t. Σbag_sizes = n_samples
-
-    Returns:
-        type: torch.Tensor, list[tuple[float]]
-
-    """
-    assert sum(bags_sizes) == X.size(0), "Mismatch between roll samples size and bags size"
-
-    # Compute bag values by taking mean coordinate of each bag
-    X_by_bag = X.split(bags_sizes)
-    bags_values = torch.stack([x.mean(dim=0) for x in X_by_bag])
-
-    # Compute minimum and maximum height of each bag
-    bags_heights = [[x[:, -1].min().item(), x[:, -1].max().item()] for x in X_by_bag]
-    return bags_values, bags_heights
+    # Extend bags tensor to match individuals size
+    extended_y = torch.cat([bag_value.repeat(bag_size, 1) for (bag_size, bag_value) in zip(bags_sizes, y)]).squeeze()
+    return x, extended_y, bags_sizes, y, z
 
 
 @setseed('torch')
-def aggregate_targets(X, t, bags_heights, individuals_noise, aggregate_noise, seed=None):
-    """Splits targets by bags height chunks and averages them
+def unmatch_datasets(x, extended_y, bags_sizes, y, z, split, seed=None):
+    """Short summary.
 
     Args:
-        X (torch.Tensor): (n_samples, 3) tensor
-        t (torch.Tensor): (n_samples,)
-        bags_heights (list[tuple[float]]): [(zmin, zmax)] of each bag
-        individuals_noise (float): noise variance to add on individuals targets
-        aggregate_noise (float): noise variance to add on aggregate targets
+        x (torch.Tensor): (n_samples, 3) tensor of individuals covariates
+        extended_y (torch.Tensor): (n_samples,) tensor of replicated bag-level covariates
+        bags_sizes (list[int]): list of bags sizes for above two tensors
+        y (torch.Tensor): (n_bags,) tensor of bag-level covariates
+        z (torch.Tensor): (n_bags,) tensor of bag aggregate targets
+        split (float): fraction of dataset to use for D1
+        seed (int): random seed
 
     Returns:
-        type: Description of returned object.
+        type: torch.Tensor, torch.Tensor, list[torch.Tensor], torch.Tensor, torch.Tensor
 
     """
-    # Add random noise on individuals targets
-    noisy_t = t.add(individuals_noise * torch.randn_like(t))
+    # Sample random permutation of bags indices
+    rdm_idx = torch.randperm(len(bags_sizes))
 
-    # Adjust lowest/highest heights to match samples in case different tensor
-    bags_heights[0][0] = X[:, -1].min().item()
-    bags_heights[-1][1] = X[:, -1].max().item()
+    # Split into 2 separate subsets
+    N1 = int(split * len(bags_sizes))
+    indices_1, indices_2 = rdm_idx[:N1], rdm_idx[N1:]
 
-    # Compute aggregate target values by averaging over height chunks
-    bags_masks = [(X[:, -1] >= zmin) & (X[:, -1] < zmax) for (zmin, zmax) in bags_heights]
-    aggregate_t = torch.stack([noisy_t[mask].mean() for mask in bags_masks])
+    # Subset x and extended_y to first subset of indices
+    x_by_bag = x.split(bags_sizes)
+    x = torch.cat([x_by_bag[idx] for idx in indices_1])
 
-    # Add random noise on aggregate observations
-    aggregate_t.add_(aggregate_noise * torch.randn_like(aggregate_t))
-    return aggregate_t
+    extended_y_by_bag = extended_y.split(bags_sizes)
+    extended_y = torch.cat([extended_y_by_bag[idx] for idx in indices_1]).squeeze()
+
+    bags_sizes = [bags_sizes[idx] for idx in indices_1]
+
+    # Subset y and z to second subset of indices
+    y = y[indices_2]
+    z = z[indices_2]
+    return x, extended_y, bags_sizes, y, z
+
+
+def make_mediating_gp_regressor(y, z, lr, n_epochs):
+    """Fit standard GP regression model between bag-level covariates and
+        bag aggregate targets
+
+    Args:
+        y (torch.Tensor): (n_bags,) tensor of bag-level covariates
+        z (torch.Tensor): (n_bags,) tensor of bag aggregate targets
+
+    Returns:
+        type: ExactGP
+
+    """
+    # Inverse softplus utility for gpytorch lengthscale intialization
+    inv_softplus = lambda x, n: torch.log(torch.exp(x * torch.ones(n)) - 1)
+
+    # Define mean and covariance modules
+    bag_mean = gpytorch.means.ZeroMean()
+
+    # Define bags kernels
+    base_bag_kernel = gpytorch.kernels.RBFKernel(ard_num_dims=1)
+    base_bag_kernel.initialize(raw_lengthscale=inv_softplus(x=1, n=1))
+    bag_kernel = gpytorch.kernels.ScaleKernel(base_bag_kernel)
+
+    # Define model
+    model = ExactGP(mean_module=bag_mean,
+                    covar_module=bag_kernel,
+                    train_x=y,
+                    train_y=z,
+                    likelihood=gpytorch.likelihoods.GaussianLikelihood())
+
+    # Set model in training mode
+    model = model.train()
+
+    # Define optimizer and exact loglikelihood module
+    optimizer = torch.optim.Adam(params=model.parameters(), lr=lr)
+    mll = gpytorch.mlls.ExactMarginalLogLikelihood(model.likelihood, model)
+
+    # Initialize progress bar
+    bar = Bar("Epoch", max=n_epochs)
+
+    for epoch in range(n_epochs):
+        # Zero-out remaining gradients
+        optimizer.zero_grad()
+
+        # Compute marginal distribution p(.|x,y)
+        output = model(model.train_inputs[0])
+
+        # Evaluate -logp(z|x, y) on aggregate observations z
+        loss = -mll(output, model.train_targets)
+
+        # Take gradient step
+        loss.backward()
+        optimizer.step()
+
+        # Evaluate model
+        model.eval()
+        with torch.no_grad():
+            posterior = model(model.train_inputs[0])
+            mse = torch.pow(posterior.mean - model.train_targets, 2).mean()
+        model.train()
+
+        # Update progress bar
+        bar.suffix = f"NLL {loss.item()} - MSE {mse.item()}"
+        bar.next()
+    return model.eval()

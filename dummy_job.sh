@@ -35,3 +35,6 @@ python experiments/downscaling/run_experiment.py --cfg=experiments/downscaling/c
 # python experiments/swiss_roll/run_experiment.py --cfg=experiments/swiss_roll/config/vbagg.yaml --o=sandbox/sandbox/vbagg --plot
 # python experiments/swiss_roll/run_experiment.py --cfg=experiments/swiss_roll/config/gp_regression.yaml --o=sandbox/sandbox/gp_regression --plot
 echo "Job Completed"
+
+python experiments/swiss_roll/run_experiment.py --cfg=experiments/swiss_roll/config/variational_cme_process.yaml --o=sandbox/variational_cme_process --device=4 --plot
+python experiments/swiss_roll/run_experiment.py --cfg=experiments/swiss_roll/config/vbagg.yaml --o=sandbox/vbagg --device=4

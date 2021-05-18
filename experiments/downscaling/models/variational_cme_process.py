@@ -31,10 +31,10 @@ def build_downscaling_variational_cme_process(covariates_grid, lbda, n_inducing_
     individuals_mean = gpytorch.means.ZeroMean()
 
     # Define individuals kernel
-    base_indiv_spatial_kernel = RFFKernel(nu=1.5, num_samples=1000, ard_num_dims=3, active_dims=[0, 1, 2])
-    base_indiv_spatial_kernel.initialize(raw_lengthscale=inv_softplus(x=1, n=3))
+    base_indiv_spatial_kernel = RFFKernel(nu=1.5, num_samples=1000, ard_num_dims=2, active_dims=[0, 1])
+    base_indiv_spatial_kernel.initialize(raw_lengthscale=inv_softplus(x=1, n=2))
 
-    base_indiv_feat_kernel = gpytorch.kernels.RFFKernel(num_samples=1000, ard_num_dims=3, active_dims=[3, 4, 5])
+    base_indiv_feat_kernel = gpytorch.kernels.RFFKernel(num_samples=1000, ard_num_dims=3, active_dims=[2, 3, 4])
     base_indiv_feat_kernel.initialize(raw_lengthscale=inv_softplus(x=1, n=3))
 
     individuals_spatial_kernel = gpytorch.kernels.ScaleKernel(base_indiv_spatial_kernel)
@@ -42,11 +42,11 @@ def build_downscaling_variational_cme_process(covariates_grid, lbda, n_inducing_
     individuals_kernel = individuals_spatial_kernel + individuals_feat_kernel
 
     # Define bags kernels
-    base_bag_spatial_kernel = gpytorch.kernels.MaternKernel(nu=1.5, ard_num_dims=3, active_dims=[0, 1, 2])
-    base_bag_spatial_kernel.initialize(raw_lengthscale=inv_softplus(x=1, n=3))
+    base_bag_spatial_kernel = gpytorch.kernels.MaternKernel(nu=1.5, ard_num_dims=2, active_dims=[0, 1])
+    base_bag_spatial_kernel.initialize(raw_lengthscale=inv_softplus(x=1, n=2))
 
-    base_bag_feat_kernel = gpytorch.kernels.RBFKernel(ard_num_dims=3, active_dims=[3, 4, 5])
-    base_bag_feat_kernel.initialize(raw_lengthscale=inv_softplus(x=1, n=3))
+    base_bag_feat_kernel = gpytorch.kernels.RBFKernel(ard_num_dims=1, active_dims=[2])
+    base_bag_feat_kernel.initialize(raw_lengthscale=inv_softplus(x=1, n=1))
 
     bag_spatial_kernel = gpytorch.kernels.ScaleKernel(base_bag_spatial_kernel)
     bag_feat_kernel = gpytorch.kernels.ScaleKernel(base_bag_feat_kernel)
@@ -72,7 +72,7 @@ def build_downscaling_variational_cme_process(covariates_grid, lbda, n_inducing_
 @TRAINERS.register('variational_cme_process')
 def train_downscaling_variational_cme_process(model, covariates_blocks, bags_blocks, extended_bags, targets_blocks, batch_size_cme,
                                               lr, n_epochs, batch_size, beta, seed, dump_dir, device_idx, covariates_grid, missing_bags_fraction,
-                                              use_individuals_noise, groundtruth_field, target_field, plot, plot_every, **kwargs):
+                                              use_individuals_noise, groundtruth_field, target_field, plot, plot_every, log_every, **kwargs):
     """Hard-coded training script of Exact CME Process for downscaling experiment
 
     Args:
@@ -102,18 +102,17 @@ def train_downscaling_variational_cme_process(model, covariates_blocks, bags_blo
     extended_bags = extended_bags.to(device)
     targets_blocks = targets_blocks.to(device)
 
-    # Drop some bags
+    # Split dataset in unmatched sets
     if seed:
         torch.random.manual_seed(seed)
     n_drop = int(missing_bags_fraction * len(targets_blocks))
     shuffled_indices = torch.randperm(len(targets_blocks)).to(device)
-    keep_idx, drop_idx = shuffled_indices[n_drop:], shuffled_indices[:n_drop]
-    bags_blocks = bags_blocks[keep_idx]
-    targets_blocks = targets_blocks[keep_idx]
+    indices_1, indices_2 = shuffled_indices[n_drop:], shuffled_indices[:n_drop]
 
-    # Flatten HR dataset
-    covariates_blocks = covariates_blocks.reshape(-1, covariates_blocks.size(-1))
-    extended_bags = extended_bags.reshape(-1, extended_bags.size(-1))
+    covariates_blocks = covariates_blocks[indices_1].reshape(-1, covariates_blocks.size(-1))
+    extended_bags = extended_bags[indices_1].reshape(-1, extended_bags.size(-1))
+    bags_blocks = bags_blocks[indices_2]
+    targets_blocks = targets_blocks[indices_2]
 
     # Define stochastic batch iterator
     def batch_iterator(batch_size):
@@ -188,30 +187,31 @@ def train_downscaling_variational_cme_process(model, covariates_blocks, bags_blo
             batch_bar.suffix = f"Running ELBO {-loss.item()}"
             batch_bar.next()
 
-        # Compute posterior distribution at current epoch and store logs
-        individuals_posterior = predict_downscaling_variational_cme_process(model=model,
-                                                                            covariates_grid=covariates_grid,
-                                                                            mean_shift=mean_shift,
-                                                                            std_scale=std_scale)
-        epoch_logs = get_epoch_logs(model, likelihood, individuals_posterior, groundtruth_field)
-        epoch_logs.update({'loss': epoch_loss / (len(targets_blocks) // batch_size)})
-        logs[epoch + 1] = epoch_logs
-        with open(os.path.join(dump_dir, 'running_logs.yaml'), 'w') as f:
-            yaml.dump({'epoch': logs}, f)
+        if epoch % log_every == 0:
+            # Compute posterior distribution at current epoch and store logs
+            individuals_posterior = predict_downscaling_variational_cme_process(model=model,
+                                                                                covariates_grid=covariates_grid,
+                                                                                mean_shift=mean_shift,
+                                                                                std_scale=std_scale)
+            epoch_logs = get_epoch_logs(model, likelihood, individuals_posterior, groundtruth_field)
+            epoch_logs.update({'loss': epoch_loss / (len(targets_blocks) // batch_size)})
+            logs[epoch + 1] = epoch_logs
+            with open(os.path.join(dump_dir, 'running_logs.yaml'), 'w') as f:
+                yaml.dump({'epoch': logs}, f)
 
-        # Dump plot of posterior prediction at current epoch
-        if plot and epoch % plot_every == 0:
-            _ = plot_downscaling_prediction(individuals_posterior, groundtruth_field, target_field, drop_idx)
-            plt.savefig(os.path.join(dump_dir, f'png/epoch_{epoch}.png'))
-            plt.close()
+            # Dump plot of posterior prediction at current epoch
+            if plot and epoch % plot_every == 0:
+                _ = plot_downscaling_prediction(individuals_posterior, groundtruth_field, target_field, indices_1)
+                plt.savefig(os.path.join(dump_dir, f'png/epoch_{epoch}.png'))
+                plt.close()
             epoch_bar.next()
             epoch_bar.finish()
 
-        # Empty cache if using GPU
-        if torch.cuda.is_available():
-            with torch.cuda.device(f"cuda:{device_idx}"):
-                del individuals_posterior
-                torch.cuda.empty_cache()
+            # Empty cache if using GPU
+            if torch.cuda.is_available():
+                with torch.cuda.device(f"cuda:{device_idx}"):
+                    del individuals_posterior
+                    torch.cuda.empty_cache()
 
     # Save model training state
     state = {'epoch': n_epochs,
@@ -237,19 +237,15 @@ def get_epoch_logs(model, likelihood, individuals_posterior, groundtruth_field):
                        'k_spatial_outputscale': k_spatial_kernel.outputscale.detach().item(),
                        'k_lengthscale_lat': k_spatial_lengthscales[0],
                        'k_lengthscale_lon': k_spatial_lengthscales[1],
-                       'k_lengthscale_alt': k_spatial_lengthscales[2],
                        'k_feat_outputscale': k_feat_kernel.outputscale.detach().item(),
-                       'k_lengthscale_albisccp': k_feat_lengthscales[0],
-                       'k_lengthscale_clt': k_feat_lengthscales[1],
-                       'k_lengthscale_pctisccp': k_feat_lengthscales[2],
+                       'k_lengthscale_alt': k_feat_lengthscales[0],
+                       'k_lengthscale_albisccp': k_feat_lengthscales[1],
+                       'k_lengthscale_clt': k_feat_lengthscales[2],
                        'l_spatial_outputscale': l_spatial_kernel.outputscale.detach().item(),
                        'l_lengthscale_lat': l_spatial_lengthscales[0],
                        'l_lengthscale_lon': l_spatial_lengthscales[1],
-                       'l_lengthscale_alt': l_spatial_lengthscales[2],
                        'l_feat_outputscale': l_feat_kernel.outputscale.detach().item(),
-                       'l_lengthscale_albisccp': l_feat_lengthscales[0],
-                       'l_lengthscale_clt': l_feat_lengthscales[1],
-                       'l_lengthscale_pctisccp': l_feat_lengthscales[2]})
+                       'l_lengthscale_pctisccp': l_feat_lengthscales[0]})
     if model.noise_kernel:
         epoch_logs.update({'indiv_noise': model.noise_kernel.outputscale.detach().item()})
     return epoch_logs

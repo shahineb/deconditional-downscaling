@@ -24,6 +24,9 @@ dataset:
     - 'orog'        # Surface Altitude
     - 'albisccp'    # Cloud Albedo
     - 'clt'         # Total Cloud Coverage
+
+  # Names of fields used as mediating covariates
+  bags_fields_names:
     - 'pctisccp'    # Mean Cloud Top Pressure
 
   # Name of field to use as target
@@ -31,8 +34,8 @@ dataset:
 
   # Downsampling block size
   block_size:
-    - 36             # height
-    - 36             # width
+    - 17             # height
+    - 17             # width
 
   # Random seed for dataset generation
   seed: 42
@@ -51,19 +54,22 @@ training:
   fill_missing: False
 
   # Learning rate
-  lr: 0.003
+  lr: 0.01
 
   # Number of iterations
-  n_epochs: 401
+  n_epochs: 601
 
   # Batch size
-  batch_size: 8
+  batch_size: 64
 
   # Weight of KL term in ELBO
   beta: 1
 
   # Plot end of epoch inference every n epoch
   plot_every: 50
+
+  # Log end of epoch inference every n epoch
+  log_every: 5
 
   # Random seed used to choose shuffle dataset
   seed: 42

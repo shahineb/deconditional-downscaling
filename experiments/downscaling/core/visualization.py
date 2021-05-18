@@ -37,37 +37,43 @@ def plot_downscaling_prediction(individuals_posterior, groundtruth_field, target
     im = ax[0, 0].imshow(target_field.values[::-1], cmap=field_cmap, vmin=min_value, vmax=max_value)
     ax[0, 0].axis('off')
     ax[0, 0].set_title("Observed LR field", fontsize=fontsize)
-    fig.colorbar(im, ax=ax[0, 0], shrink=0.5)
+    cb = fig.colorbar(im, ax=ax[0, 0], shrink=0.5)
+    cb.ax.tick_params(labelsize=fontsize)
 
     # Plot mean posterior prediction
     im = ax[0, 1].imshow(mean_pred.numpy()[::-1], cmap=field_cmap, vmin=min_value, vmax=max_value)
     ax[0, 1].axis('off')
     ax[0, 1].set_title("Mean Posterior Prediction", fontsize=fontsize)
-    fig.colorbar(im, ax=ax[0, 1], shrink=0.5)
+    cb = fig.colorbar(im, ax=ax[0, 1], shrink=0.5)
+    cb.ax.tick_params(labelsize=fontsize)
 
     # Plot 95% confidence region size
     im = ax[0, 2].imshow(conf_size.numpy()[::-1], cmap=uncertainty_cmap)
     ax[0, 2].axis('off')
     ax[0, 2].set_title("Confidence Region Size (±2σ)", fontsize=fontsize)
-    fig.colorbar(im, ax=ax[0, 2], shrink=0.5)
+    cb = fig.colorbar(im, ax=ax[0, 2], shrink=0.5)
+    cb.ax.tick_params(labelsize=fontsize)
 
     # Plot unobserved groundtruth HR field
     im = ax[1, 0].imshow(groundtruth.numpy()[::-1], cmap=field_cmap, vmin=min_value, vmax=max_value)
     ax[1, 0].axis('off')
     ax[1, 0].set_title("Unobserved groundtruth HR field", fontsize=fontsize)
-    fig.colorbar(im, ax=ax[1, 0], shrink=0.5)
+    cb = fig.colorbar(im, ax=ax[1, 0], shrink=0.5)
+    cb.ax.tick_params(labelsize=fontsize)
 
     # Plot pixelwise squared error
     im = ax[1, 1].imshow(squared_error.numpy()[::-1], cmap=squared_error_cmap)
     ax[1, 1].axis('off')
     ax[1, 1].set_title("Squared Error", fontsize=fontsize)
-    fig.colorbar(im, ax=ax[1, 1], shrink=0.5)
+    cb = fig.colorbar(im, ax=ax[1, 1], shrink=0.5)
+    cb.ax.tick_params(labelsize=fontsize)
 
     # Plot pixelwise bias
     im = ax[1, 2].imshow(difference.numpy()[::-1], cmap=bias_cmap, vmin=-diff_abs_max, vmax=diff_abs_max)
     ax[1, 2].axis('off')
     ax[1, 2].set_title("(Grountruth) – (Mean Posterior)", fontsize=fontsize)
-    fig.colorbar(im, ax=ax[1, 2], shrink=0.5)
+    cb = fig.colorbar(im, ax=ax[1, 2], shrink=0.5)
+    cb.ax.tick_params(labelsize=fontsize)
 
     plt.tight_layout()
     return fig

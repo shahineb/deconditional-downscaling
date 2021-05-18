@@ -7,7 +7,7 @@ from gpytorch.likelihoods import GaussianLikelihood
 class CMEProcessLikelihood(GaussianLikelihood):
 
     def __init__(self, use_individuals_noise=True, **kwargs):
-        super().__init__()
+        super().__init__(**kwargs)
         self.use_individuals_noise = use_individuals_noise
 
     def expected_log_prob(self, observations, variational_dist, root_inv_extended_bags_covar, bags_to_extended_bags_covar, individuals_noise=None):
@@ -94,20 +94,21 @@ class CMEProcessLikelihood(GaussianLikelihood):
         """
         # Extract variational posterior parameters
         variational_mean = variational_dist.mean
-        variational_covar_cholesky = variational_dist.lazy_covariance_matrix.cholesky()
-
-        # Setup identity lazy tensor for efficient quad computations
-        Id_n = lazy.DiagLazyTensor(diag=torch.ones_like(observations))
-        Id_N = lazy.DiagLazyTensor(diag=torch.ones(variational_covar_cholesky.size(-1), device=variational_mean.device))
+        # variational_covar_cholesky = variational_dist.lazy_covariance_matrix.cholesky()
+        # variational_covar = variational_dist.lazy_covariance_matrix
+        variational_covar = lazy.DiagLazyTensor(diag=variational_dist.variance)
 
         # Compute low rank A^T aggregation term, agg_term = l(bags, extended_bags)(L + λNI)^{-1/2}
         agg_term = bags_to_extended_bags_covar @ root_inv_extended_bags_covar
 
         # Compute mean loss term
-        mean_term = Id_n.inv_quad(observations - agg_term @ root_inv_extended_bags_covar.t() @ variational_mean)
+        mean_error = observations - agg_term @ root_inv_extended_bags_covar.t() @ variational_mean
+        mean_term = torch.dot(mean_error, mean_error)
 
         # Compute covariance loss term
-        covar_term = Id_N.inv_quad(variational_covar_cholesky.t() @ root_inv_extended_bags_covar @ agg_term.t())
+        A = root_inv_extended_bags_covar @ agg_term.t()
+        foo = A.t() @ variational_covar @ A
+        covar_term = foo.evaluate().diag().sum()
 
         # Sum up everything to obtain expected logprob under variational distribution
         constant_term = len(observations) * torch.log(2 * np.pi * self.noise)

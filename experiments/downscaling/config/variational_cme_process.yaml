@@ -31,6 +31,9 @@ dataset:
     - 'orog'        # Surface Altitude
     - 'albisccp'    # Cloud Albedo
     - 'clt'         # Total Cloud Coverage
+
+  # Names of fields used as mediating covariates
+  bags_fields_names:
     - 'pctisccp'    # Mean Cloud Top Pressure
 
   # Name of field to use as target

@@ -9,7 +9,7 @@ from core.metrics import compute_metrics, compute_chunked_nll
 
 
 @MODELS.register('bagged_gp')
-def build_swiss_roll_bagged_gp(individuals, aggregate_targets, bags_sizes, independent_bags, **kwargs):
+def build_swiss_roll_bagged_gp(individuals, bags_sizes, aggregate_targets, independent_bags, **kwargs):
     """Hard-coded initialization of Exact CME Process module used for swiss roll experiment
 
     Args:

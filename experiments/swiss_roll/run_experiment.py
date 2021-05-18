@@ -11,6 +11,7 @@ Options:
   --cfg=<path_to_config>           Path to YAML configuration file to use.
   --o=<output_dir>                 Output directory.
   --device=<device_index>          Index of GPU to use [default: 0].
+  --unmatched                        Whether to run version with matched or unmatched datasets.
   --n_bags=<n_bags>                Number of bags to generate.
   --lr=<lr>                        Learning rate.
   --beta=<beta>                    Weight of KL term in ELBO for variational formulation.
@@ -23,6 +24,7 @@ import os
 import yaml
 import logging
 from docopt import docopt
+import torch
 import matplotlib.pyplot as plt
 import core.generation as gen
 import core.visualization as vis
@@ -31,7 +33,7 @@ from models import build_model, train_model, predict
 
 def main(args, cfg):
     # Generate bagged swiss roll dataset
-    bags_sizes, individuals, bags_values, aggregate_targets, X, t, X_gt, t_gt = make_dataset(cfg['dataset'])
+    bags_sizes, individuals, extended_bags_values, bags_values, aggregate_targets, X, t = make_dataset(cfg, args['--unmatched'])
     logging.info("Generated bag swiss roll dataset\n")
 
     # Save dataset scatter plot
@@ -40,13 +42,15 @@ def main(args, cfg):
                   filename='dataset.png',
                   output_dir=args['--o'],
                   individuals=individuals,
-                  groundtruth_individuals=X_gt,
-                  targets=t_gt,
+                  extended_bags_values=extended_bags_values,
+                  groundtruth_individuals=X,
+                  targets=t,
                   aggregate_targets=aggregate_targets,
                   bags_sizes=bags_sizes)
 
     # Create model
     cfg['model'].update(individuals=individuals,
+                        extended_bags_values=extended_bags_values,
                         bags_values=bags_values,
                         aggregate_targets=aggregate_targets,
                         bags_sizes=bags_sizes)
@@ -57,6 +61,7 @@ def main(args, cfg):
     logging.info("Fitting model hyperparameters\n")
     cfg['training'].update(model=model,
                            individuals=individuals,
+                           extended_bags_values=extended_bags_values,
                            bags_values=bags_values,
                            aggregate_targets=aggregate_targets,
                            bags_sizes=bags_sizes,
@@ -85,34 +90,44 @@ def main(args, cfg):
                   targets=t)
 
 
-def make_dataset(cfg):
+def make_dataset(cfg, unmatched):
     """Generates bagged swiss-roll dataset
 
     Args:
         cfg (dict): input arguments
+        matched (bool): which experiment to generate dataset
 
     Returns:
         type: list[int], torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor
 
     """
-    # Generate groundtruth and uniform swiss rolls
-    X_gt, t_gt = gen.make_swiss_roll(n_samples=cfg['n_samples'],
-                                     groundtruth=True,
-                                     standardize=True,
-                                     seed=cfg['seed'])
-    X, t = gen.make_swiss_roll(n_samples=cfg['n_samples'],
-                               groundtruth=False,
+    # Generate swiss rolls
+    X, t = gen.make_swiss_roll(n_samples=cfg['dataset']['n_samples'],
                                standardize=True,
-                               seed=cfg['seed'])
+                               seed=cfg['dataset']['seed'])
 
     # Compose into bagged dataset
-    individuals, bags_sizes, bags_values, aggregate_targets = gen.compose_bags_dataset(X=X,
-                                                                                       X_gt=X_gt,
-                                                                                       t_gt=t_gt,
-                                                                                       n_bags=cfg['n_bags'],
-                                                                                       noise=cfg['noise'])
+    individuals, extended_bags_values, bags_sizes, bags_values, aggregate_targets = gen.compose_bags_dataset(X=X,
+                                                                                                             t=t,
+                                                                                                             n_bags=cfg['dataset']['n_bags'],
+                                                                                                             noise=cfg['dataset']['noise'],
+                                                                                                             seed=cfg['dataset']['seed'])
 
-    return bags_sizes, individuals, bags_values, aggregate_targets, X, t, X_gt, t_gt
+    # If needed unmatch unmatch_datasets
+    if unmatched:
+        individuals, extended_bags_values, bags_sizes, bags_values, aggregate_targets = gen.unmatch_datasets(x=individuals,
+                                                                                                             extended_y=extended_bags_values,
+                                                                                                             bags_sizes=bags_sizes,
+                                                                                                             y=bags_values,
+                                                                                                             z=aggregate_targets,
+                                                                                                             split=0.5)
+
+        # Replace aggregate targets with regression mediated targets if needed
+        if cfg['model']['name'] in {'bagged_gp', 'gp_regression', 'vbagg'}:
+            regressor = gen.make_mediating_gp_regressor(y=bags_values, z=aggregate_targets, lr=0.01, n_epochs=100)
+            with torch.no_grad():
+                aggregate_targets = regressor(extended_bags_values.unique()).mean
+    return bags_sizes, individuals, extended_bags_values, bags_values, aggregate_targets, X, t
 
 
 def dump_plot(plotting_function, filename, output_dir, *plot_args, **plot_kwargs):

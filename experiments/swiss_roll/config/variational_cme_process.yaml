@@ -49,7 +49,7 @@ training:
   lr: 0.05
 
   # Number of iterations
-  n_epochs: 200
+  n_epochs: 300
 
   # Weight of KL term in ELBO
   beta: 1

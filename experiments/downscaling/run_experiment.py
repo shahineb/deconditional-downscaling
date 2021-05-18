@@ -18,6 +18,7 @@ Options:
   --lbda=<lbda>                    CME inverse regularization term
   --n_epochs=<n_epochs>            Number of training epochs
   --plot                           Outputs scatter plots.
+  --log_every=<every_epoch>        Dump logs every X epoch
   --seed=<seed>                    Random seed.
 """
 import os
@@ -35,13 +36,15 @@ def main(args, cfg):
     groundtruth_field = preproc.trim(field=fields[cfg['dataset']['target_field_name']], block_size=cfg['dataset']['block_size'])
 
     # Preprocess into covariates and target fields
-    covariates_fields, aggregate_target_field, raw_aggregate_target_field = preproc.preprocess_fields(fields=fields,
-                                                                                                      covariate_fields_names=cfg['dataset']['covariate_fields_names'],
-                                                                                                      target_field_name=cfg['dataset']['target_field_name'],
-                                                                                                      block_size=cfg['dataset']['block_size'])
+    covariates_fields, bags_fields, aggregate_target_field, raw_aggregate_target_field = preproc.preprocess_fields(fields=fields,
+                                                                                                                   covariate_fields_names=cfg['dataset']['covariate_fields_names'],
+                                                                                                                   bags_fields_names=cfg['dataset']['bags_fields_names'],
+                                                                                                                   target_field_name=cfg['dataset']['target_field_name'],
+                                                                                                                   block_size=cfg['dataset']['block_size'])
 
     # Convert into pytorch friendly dataset
     covariates_grid, covariates_blocks, bags_blocks, extended_bags, targets_blocks = preproc.make_tensor_dataset(covariates_fields=covariates_fields,
+                                                                                                                 bags_fields=bags_fields,
                                                                                                                  aggregate_target_field=aggregate_target_field,
                                                                                                                  block_size=cfg['dataset']['block_size'])
     logging.info("Loaded and formatted cloud fields downscaling dataset\n")
@@ -95,6 +98,8 @@ def update_cfg(cfg, args):
         cfg['training']['beta'] = float(args['--beta'])
     if args['--n_epochs']:
         cfg['training']['n_epochs'] = int(args['--n_epochs'])
+    if args['--log_every']:
+        cfg['training']['log_every'] = int(args['--log_every'])
     return cfg
 
 

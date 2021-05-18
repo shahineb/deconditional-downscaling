@@ -1,11 +1,18 @@
 ################################################################################
-#   CONFIGURATIONS FOR SWISS ROLL EXPERIMENT WITH GP REGRESSION
+#   CONFIGURATIONS FOR SWISS ROLL EXPERIMENT WITH EXACT CME PROCESS
 ################################################################################
+
 
 # MODEL SPECIFICATIONS
 model:
   # Name of model to use
-  name: 'gp_regression'
+  name: 'exact_cme_process'
+
+  # CME regularization parameter
+  lbda: 0.01
+
+  # Whether to use noised individuals model or not
+  use_individuals_noise: False
 
 
 # DATASET
@@ -26,7 +33,7 @@ dataset:
 # TRAINING
 training:
   # Name of model to use
-  name: 'gp_regression'
+  name: 'exact_cme_process'
 
   # Learning rate
   lr: 0.1

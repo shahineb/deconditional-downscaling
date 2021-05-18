@@ -45,7 +45,7 @@ class BagVariationalELBO(MarginalLogLikelihood):
                 Additional arguments passed to the likelihood's `expected_log_prob` function.
         """
         # Get likelihood term and KL term
-        log_likelihood = self._log_likelihood_term(variational_dist_f, target, **kwargs)
+        log_likelihood = self._log_likelihood_term(variational_dist_f, target, **kwargs).div(target.size(0))
         kl_divergence = self.model.variational_strategy.kl_divergence().div(self.num_data / self.beta)
 
         # Add any additional registered loss terms

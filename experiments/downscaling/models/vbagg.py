@@ -4,7 +4,6 @@ import logging
 import torch
 import gpytorch
 import matplotlib.pyplot as plt
-from sklearn.linear_model import LinearRegression
 from progress.bar import Bar
 from models import VariationalGP, VBaggGaussianLikelihood, BagVariationalELBO, RFFKernel, ExactGP, MODELS, TRAINERS, PREDICTERS
 from core.visualization import plot_downscaling_prediction
@@ -31,10 +30,10 @@ def build_downscaling_vbagg_model(covariates_grid, n_inducing_points, seed, **kw
     individuals_mean = gpytorch.means.ZeroMean()
 
     # Define individuals kernel
-    base_indiv_spatial_kernel = RFFKernel(nu=1.5, num_samples=1000, ard_num_dims=3, active_dims=[0, 1, 2])
-    base_indiv_spatial_kernel.initialize(raw_lengthscale=inv_softplus(x=1, n=3))
+    base_indiv_spatial_kernel = RFFKernel(nu=1.5, num_samples=1000, ard_num_dims=2, active_dims=[0, 1])
+    base_indiv_spatial_kernel.initialize(raw_lengthscale=inv_softplus(x=1, n=2))
 
-    base_indiv_feat_kernel = gpytorch.kernels.RFFKernel(num_samples=1000, ard_num_dims=3, active_dims=[3, 4, 5])
+    base_indiv_feat_kernel = gpytorch.kernels.RFFKernel(num_samples=1000, ard_num_dims=3, active_dims=[2, 3, 4])
     base_indiv_feat_kernel.initialize(raw_lengthscale=inv_softplus(x=1, n=3))
 
     individuals_spatial_kernel = gpytorch.kernels.ScaleKernel(base_indiv_spatial_kernel)
@@ -63,11 +62,11 @@ def fit_gp_regression(bags_blocks, targets_blocks, device):
     bag_mean = gpytorch.means.ZeroMean()
 
     # Define bags kernels
-    base_bag_spatial_kernel = gpytorch.kernels.MaternKernel(nu=1.5, ard_num_dims=3, active_dims=[0, 1, 2])
-    base_bag_spatial_kernel.initialize(raw_lengthscale=inv_softplus(x=1, n=3))
+    base_bag_spatial_kernel = gpytorch.kernels.MaternKernel(nu=1.5, ard_num_dims=2, active_dims=[0, 1])
+    base_bag_spatial_kernel.initialize(raw_lengthscale=inv_softplus(x=1, n=2))
 
-    base_bag_feat_kernel = gpytorch.kernels.RBFKernel(ard_num_dims=3, active_dims=[3, 4, 5])
-    base_bag_feat_kernel.initialize(raw_lengthscale=inv_softplus(x=1, n=3))
+    base_bag_feat_kernel = gpytorch.kernels.RBFKernel(ard_num_dims=1, active_dims=[2])
+    base_bag_feat_kernel.initialize(raw_lengthscale=inv_softplus(x=1, n=1))
 
     bag_spatial_kernel = gpytorch.kernels.ScaleKernel(base_bag_spatial_kernel)
     bag_feat_kernel = gpytorch.kernels.ScaleKernel(base_bag_feat_kernel)
@@ -120,7 +119,7 @@ def fit_gp_regression(bags_blocks, targets_blocks, device):
 @TRAINERS.register('vbagg')
 def train_downscaling_vbagg_model(model, covariates_blocks, bags_blocks, extended_bags, targets_blocks, fill_missing,
                                   lr, n_epochs, batch_size, beta, seed, dump_dir, covariates_grid, missing_bags_fraction,
-                                  device_idx, groundtruth_field, target_field, plot, plot_every, **kwargs):
+                                  device_idx, groundtruth_field, target_field, plot, plot_every, log_every, **kwargs):
     """Hard-coded training script of Vbagg model for downscaling experiment
 
     Args:
@@ -154,18 +153,12 @@ def train_downscaling_vbagg_model(model, covariates_blocks, bags_blocks, extende
         torch.random.manual_seed(seed)
     n_drop = int(missing_bags_fraction * len(targets_blocks))
     shuffled_indices = torch.randperm(len(targets_blocks)).to(device)
-    keep_idx, drop_idx = shuffled_indices[n_drop:], shuffled_indices[:n_drop]
-    if fill_missing:
-        # linreg = LinearRegression()
-        # linreg.fit(bags_blocks[keep_idx].cpu(), targets_blocks[keep_idx].cpu())
-        # targets_blocks[drop_idx] = torch.from_numpy(linreg.predict(bags_blocks[drop_idx].cpu())).to(device)
-        regressor = fit_gp_regression(bags_blocks[keep_idx].cpu(), targets_blocks[keep_idx].cpu(), device)
-        with torch.no_grad():
-            targets_blocks[drop_idx] = regressor(bags_blocks[drop_idx]).mean
-    else:
-        covariates_blocks = covariates_blocks[keep_idx]
-        bags_blocks = bags_blocks[keep_idx]
-        targets_blocks = targets_blocks[keep_idx]
+    indices_1, indices_2 = shuffled_indices[n_drop:], shuffled_indices[:n_drop]
+
+    regressor = fit_gp_regression(bags_blocks[indices_2].cpu(), targets_blocks[indices_2].cpu(), device)
+    with torch.no_grad():
+        covariates_blocks = covariates_blocks[indices_1]
+        targets_blocks = regressor(bags_blocks[indices_1]).mean
 
     # Define stochastic batch iterator
     def batch_iterator(batch_size):
@@ -173,10 +166,9 @@ def train_downscaling_vbagg_model(model, covariates_blocks, bags_blocks, extende
         n_dim_individuals = covariates_blocks.size(-1)
         for idx in rdm_indices.split(batch_size):
             x = covariates_blocks[idx].reshape(-1, n_dim_individuals)
-            y = bags_blocks[idx]
             z = targets_blocks[idx]
             bags_sizes = [covariates_blocks.size(1)] * len(idx)
-            yield x, y, z, bags_sizes
+            yield x, z, bags_sizes
 
     # Define VBAGG likelihood
     likelihood = VBaggGaussianLikelihood()
@@ -205,7 +197,7 @@ def train_downscaling_vbagg_model(model, covariates_blocks, bags_blocks, extende
         batch_bar = Bar("Batch", max=len(targets_blocks) // batch_size)
         epoch_loss = 0
 
-        for x, y, z, bags_sizes in batch_iterator(batch_size):
+        for x, z, bags_sizes in batch_iterator(batch_size):
             # Zero-out remaining gradients
             optimizer.zero_grad()
 
@@ -228,34 +220,35 @@ def train_downscaling_vbagg_model(model, covariates_blocks, bags_blocks, extende
         # Empty cache if using GPU
         if torch.cuda.is_available():
             with torch.cuda.device(f"cuda:{device_idx}"):
-                del x, y, z, bags_sizes, q
+                del x, z, bags_sizes, q
                 optimizer.zero_grad()
                 torch.cuda.empty_cache()
 
-        # Compute posterior distribution at current epoch and store metrics
-        individuals_posterior = predict_downscaling_vbagg_model(model=model,
-                                                                covariates_grid=covariates_grid,
-                                                                mean_shift=mean_shift,
-                                                                std_scale=std_scale)
-        epoch_logs = get_epoch_logs(model, likelihood, individuals_posterior, groundtruth_field)
-        epoch_logs.update({'loss': epoch_loss / (len(targets_blocks) // batch_size)})
-        logs[epoch + 1] = epoch_logs
-        with open(os.path.join(dump_dir, 'running_logs.yaml'), 'w') as f:
-            yaml.dump({'epoch': logs}, f)
+        if epoch % log_every == 0:
+            # Compute posterior distribution at current epoch and store metrics
+            individuals_posterior = predict_downscaling_vbagg_model(model=model,
+                                                                    covariates_grid=covariates_grid,
+                                                                    mean_shift=mean_shift,
+                                                                    std_scale=std_scale)
+            epoch_logs = get_epoch_logs(model, likelihood, individuals_posterior, groundtruth_field)
+            epoch_logs.update({'loss': epoch_loss / (len(targets_blocks) // batch_size)})
+            logs[epoch + 1] = epoch_logs
+            with open(os.path.join(dump_dir, 'running_logs.yaml'), 'w') as f:
+                yaml.dump({'epoch': logs}, f)
 
-        # Dump plot of posterior prediction at current epoch
-        if plot and epoch % plot_every == 0:
-            _ = plot_downscaling_prediction(individuals_posterior, groundtruth_field, target_field, drop_idx)
-            plt.savefig(os.path.join(dump_dir, f'png/epoch_{epoch}.png'))
-            plt.close()
-        epoch_bar.next()
-        epoch_bar.finish()
+            # Dump plot of posterior prediction at current epoch
+            if plot and epoch % plot_every == 0:
+                _ = plot_downscaling_prediction(individuals_posterior, groundtruth_field, target_field, indices_1)
+                plt.savefig(os.path.join(dump_dir, f'png/epoch_{epoch}.png'))
+                plt.close()
+            epoch_bar.next()
+            epoch_bar.finish()
 
-        # Empty cache if using GPU
-        if torch.cuda.is_available():
-            with torch.cuda.device(f"cuda:{device_idx}"):
-                del individuals_posterior
-                torch.cuda.empty_cache()
+            # Empty cache if using GPU
+            if torch.cuda.is_available():
+                with torch.cuda.device(f"cuda:{device_idx}"):
+                    del individuals_posterior
+                    torch.cuda.empty_cache()
 
     # Save model training state
     state = {'epoch': n_epochs,
@@ -277,11 +270,10 @@ def get_epoch_logs(model, likelihood, individuals_posterior, groundtruth_field):
                        'k_spatial_outputscale': k_spatial_kernel.outputscale.detach().item(),
                        'k_lengthscale_lat': k_spatial_lengthscales[0],
                        'k_lengthscale_lon': k_spatial_lengthscales[1],
-                       'k_lengthscale_alt': k_spatial_lengthscales[2],
                        'k_feat_outputscale': k_feat_kernel.outputscale.detach().item(),
-                       'k_lengthscale_albisccp': k_feat_lengthscales[0],
-                       'k_lengthscale_clt': k_feat_lengthscales[1],
-                       'k_lengthscale_pctisccp': k_feat_lengthscales[2]})
+                       'k_lengthscale_alt': k_feat_lengthscales[0],
+                       'k_lengthscale_albisccp': k_feat_lengthscales[1],
+                       'k_lengthscale_clt': k_feat_lengthscales[2]})
     return epoch_logs
 
 

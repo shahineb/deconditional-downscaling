@@ -19,7 +19,6 @@ def build_swiss_roll_variational_cme_process(n_inducing_points, lbda,
         individuals (torch.Tensor)
         bags_values (torch.Tensor)
         aggregate_targets (torch.Tensor)
-        bags_sizes (list[int])
         use_individuals_noise (bool)
         seed (int)
 
@@ -59,7 +58,7 @@ def build_swiss_roll_variational_cme_process(n_inducing_points, lbda,
 
 
 @TRAINERS.register('variational_cme_process')
-def train_swiss_roll_variational_cme_process(model, individuals, bags_values, aggregate_targets, bags_sizes,
+def train_swiss_roll_variational_cme_process(model, individuals, extended_bags_values, bags_values, aggregate_targets,
                                              use_individuals_noise, lr, n_epochs, beta, seed,
                                              groundtruth_individuals, groundtruth_targets, device_idx, chunk_size, dump_dir, **kwargs):
     """Hard-coded training script of Variational CME Process for swiss roll experiment
@@ -68,7 +67,6 @@ def train_swiss_roll_variational_cme_process(model, individuals, bags_values, ag
         model (VariationalGP)
         individuals (torch.Tensor)
         aggregate_targets (torch.Tensor)
-        bags_sizes (list[int])
         lr (float)
         n_epochs (int)
         beta (float)
@@ -77,6 +75,7 @@ def train_swiss_roll_variational_cme_process(model, individuals, bags_values, ag
     # Transfer on device
     device = torch.device(f"cuda:{device_idx}") if torch.cuda.is_available() else torch.device("cpu")
     individuals = individuals.to(device)
+    extended_bags_values = extended_bags_values.to(device)
     bags_values = bags_values.to(device)
     aggregate_targets = aggregate_targets.to(device)
     groundtruth_individuals = groundtruth_individuals.to(device)
@@ -93,9 +92,6 @@ def train_swiss_roll_variational_cme_process(model, individuals, bags_values, ag
     parameters = list(model.parameters()) + list(likelihood.parameters())
     optimizer = torch.optim.Adam(params=parameters, lr=lr)
     elbo = BagVariationalELBO(likelihood, model, num_data=len(aggregate_targets), beta=beta)
-
-    # Extend bags tensor to match individuals size
-    extended_bags_values = torch.cat([bag_value.repeat(bag_size, 1) for (bag_size, bag_value) in zip(bags_sizes, bags_values)]).squeeze()
 
     # Initialize progress bar
     bar = Bar("Epoch", max=n_epochs)
