@@ -8,6 +8,8 @@ from progress.bar import Bar
 from models import VariationalGP, RFFKernel, ExactGP, MODELS, TRAINERS, PREDICTERS
 from core.visualization import plot_downscaling_prediction
 from core.metrics import compute_metrics
+plt.rcParams['font.family'] = 'serif'
+plt.rcParams['font.serif'] = ['Times New Roman'] + plt.rcParams['font.serif']
 
 
 @MODELS.register('krigging')

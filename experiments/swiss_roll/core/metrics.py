@@ -30,3 +30,19 @@ def compute_chunked_nll(model, predict, groundtruth_individuals, groundtruth_tar
     except gpytorch.utils.errors.NotPSDError:
         output = np.nan
     return output
+
+
+def compute_chunked_nll_bagged_inputs(model, predict, groundtruth_individuals, groundtruth_bags_sizes, groundtruth_targets, chunk_size):
+    """Compute NLL on chunks of dataset for scalability issue and averages chunks NLL
+    """
+    try:
+        nlls = []
+        with gpytorch.settings.fast_computations(log_prob=False, covar_root_decomposition=False):
+            for bag_size, X, t in zip(groundtruth_bags_sizes, groundtruth_individuals.split(groundtruth_bags_sizes), groundtruth_targets.split(groundtruth_bags_sizes)):
+                sub_posterior = predict(model=model, individuals=X, bags_sizes=[bag_size])
+                nll = -sub_posterior.log_prob(t).div(bag_size)
+                nlls.append(nll.item())
+        output = float(np.mean(nlls))
+    except gpytorch.utils.errors.NotPSDError:
+        output = np.nan
+    return output

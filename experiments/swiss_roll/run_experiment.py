@@ -33,7 +33,7 @@ from models import build_model, train_model, predict
 
 def main(args, cfg):
     # Generate bagged swiss roll dataset
-    bags_sizes, individuals, extended_bags_values, bags_values, aggregate_targets, X, t = make_dataset(cfg, args['--unmatched'])
+    bags_sizes, individuals, extended_bags_values, bags_values, aggregate_targets, X, t, bags_sizes_X_t = make_dataset(cfg, args['--unmatched'])
     logging.info("Generated bag swiss roll dataset\n")
 
     # Save dataset scatter plot
@@ -66,6 +66,7 @@ def main(args, cfg):
                            aggregate_targets=aggregate_targets,
                            bags_sizes=bags_sizes,
                            groundtruth_individuals=X,
+                           groundtruth_bags_sizes=bags_sizes_X_t,
                            groundtruth_targets=t,
                            chunk_size=cfg['evaluation']['chunk_size_nll'],
                            device_idx=args['--device'],
@@ -78,7 +79,8 @@ def main(args, cfg):
         logging.info("Plotting individuals posterior\n")
         predict_kwargs = {'name': cfg['model']['name'],
                           'model': model.eval().cpu(),
-                          'individuals': X}
+                          'individuals': X,
+                          'bags_sizes': bags_sizes_X_t}
         individuals_posterior = predict(predict_kwargs)
 
         # Dump scatter plot
@@ -112,12 +114,13 @@ def make_dataset(cfg, unmatched):
                                                                                                              n_bags=cfg['dataset']['n_bags'],
                                                                                                              noise=cfg['dataset']['noise'],
                                                                                                              seed=cfg['dataset']['seed'])
+    bags_sizes_X_t = bags_sizes
 
     # If needed unmatch unmatch_datasets
     if unmatched:
         individuals, extended_bags_values, bags_sizes, bags_values, aggregate_targets = gen.unmatch_datasets(x=individuals,
                                                                                                              extended_y=extended_bags_values,
-                                                                                                             bags_sizes=bags_sizes,
+                                                                                                             bags_sizes=bags_sizes_X_t,
                                                                                                              y=bags_values,
                                                                                                              z=aggregate_targets,
                                                                                                              split=0.5)
@@ -127,7 +130,7 @@ def make_dataset(cfg, unmatched):
             regressor = gen.make_mediating_gp_regressor(y=bags_values, z=aggregate_targets, lr=0.01, n_epochs=100)
             with torch.no_grad():
                 aggregate_targets = regressor(extended_bags_values.unique()).mean
-    return bags_sizes, individuals, extended_bags_values, bags_values, aggregate_targets, X, t
+    return bags_sizes, individuals, extended_bags_values, bags_values, aggregate_targets, X, t, bags_sizes_X_t
 
 
 def dump_plot(plotting_function, filename, output_dir, *plot_args, **plot_kwargs):
