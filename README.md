@@ -1,6 +1,6 @@
 # Deconditional Downscaling with Gaussian Processes
 
-# Getting started
+## Getting started
 
 _Fill with brief description and command to run for immediate try out of repo_
 
@@ -46,7 +46,7 @@ $ python experiments/downscaling/run_experiment.py --cfg=path/to/config/file --o
 
 
 
-# Installation
+## Installation
 
 Code implemented in Python 3.8.0
 
