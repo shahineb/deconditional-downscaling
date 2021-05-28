@@ -2,8 +2,6 @@
 
 ## Getting started
 
-_Fill with brief description and command to run for immediate try out of repo_
-
 - Run Swiss Roll experiment with matched dataset
 
 Pick one of the configuration files listed under
