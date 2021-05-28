@@ -279,3 +279,25 @@ def predict_downscaling_variational_krigging(model, covariates_grid, mean_shift,
     # Set model back to training mode
     model.train()
     return output
+
+
+def levenshtein(string_1, string_2):
+    rows = len(string_1) + 1
+    cols = len(string_2) + 1
+    dist = [[0 for x in range(cols)] for x in range(rows)]
+
+    for i in range(1, rows):
+        dist[i][0] = i
+    for i in range(1, cols):
+        dist[0][i] = i
+
+    for col in range(1, cols):
+        for row in range(1, rows):
+            if string_1[row - 1] == string_2[col - 1]:
+                cost = 0
+            else:
+                cost = 1
+            dist[row][col] = min(dist[row - 1][col] + 1,
+                                 dist[row][col - 1] + 1,
+                                 dist[row - 1][col - 1] + cost)
+    return dist[row][col]
