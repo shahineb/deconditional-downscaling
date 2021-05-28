@@ -1,11 +1,23 @@
 from abc import ABC
 import torch
+from gpytorch.kernels import ScaleKernel
 from src.means import CMEAggregateMean
-from src.kernels import CMEAggregateKernel
+from src.kernels import CMEAggregateKernel, DeltaKernel
 
 
 class CMEProcess(ABC):
     """General class interface methods common to variations of CME process"""
+
+    def _init_noise_kernel(self, raw_noise):
+        """Initializes individuals noise kernel
+
+        Args:
+            raw_noise (float): initialization for raw noise value
+                (i.e. fed to softplus transform in gpytorch)
+
+        """
+        self.noise_kernel = ScaleKernel(base_kernel=DeltaKernel())
+        self.noise_kernel.initialize(raw_outputscale=raw_noise * torch.ones(1))
 
     def _init_cme_mean_covar_modules(self, individuals, extended_bags_values):
         """Initializes CME aggregate mean and covariance modules based on provided
@@ -16,8 +28,9 @@ class CMEProcess(ABC):
             extended_bags_values (torch.Tensor): (N, r) tensor of individuals bags values
         """
         # Evaluate tensors needed to compute CME estimate
-        latent_individuals_mean, latent_individuals_covar, root_inv_bags_covar = self._get_cme_estimate_parameters(individuals=individuals,
-                                                                                                                   extended_bags_values=extended_bags_values)
+        with torch.no_grad():
+            latent_individuals_mean, latent_individuals_covar, root_inv_bags_covar = self._get_cme_estimate_parameters(individuals=individuals,
+                                                                                                                       extended_bags_values=extended_bags_values)
 
         # Initialize CME aggregate mean and covariance functions
         mean_module_kwargs = {'bag_kernel': self.bag_kernel,
@@ -45,10 +58,12 @@ class CMEProcess(ABC):
         # Evaluate underlying GP mean and covariance on individuals
         latent_individuals_mean = self.individuals_mean(individuals)
         latent_individuals_covar = self.individuals_kernel(individuals)
+        if self.noise_kernel is not None:
+            latent_individuals_covar = latent_individuals_covar + self.noise_kernel(individuals)
 
         # Compute precision matrix of bags values
         bags_covar = self.bag_kernel(extended_bags_values)
-        foo = bags_covar.add_diag(self.lbda * len(extended_bags_values) * torch.ones(len(extended_bags_values)))
+        foo = bags_covar.add_diag(self.lbda * len(extended_bags_values) * torch.ones(len(extended_bags_values), device=extended_bags_values.device))
         root_inv_bags_covar = foo.root_inv_decomposition().root
         return latent_individuals_mean, latent_individuals_covar, root_inv_bags_covar
 
@@ -62,11 +77,12 @@ class CMEProcess(ABC):
         """
         latent_individuals_mean, latent_individuals_covar, root_inv_bags_covar = self._get_cme_estimate_parameters(individuals=individuals,
                                                                                                                    extended_bags_values=extended_bags_values)
-        self.mean_module.root_inv_bags_covar = root_inv_bags_covar
+        self.mean_module.individuals_mean = self.individuals_mean(individuals)
         self.mean_module.bags_values = extended_bags_values
+        self.mean_module.root_inv_bags_covar = root_inv_bags_covar
+        self.covar_module.bags_values = extended_bags_values
         self.covar_module.individuals_covar = latent_individuals_covar
         self.covar_module.root_inv_bags_covar = root_inv_bags_covar
-        self.covar_module.bags_values = extended_bags_values
 
     def get_individuals_to_cme_covar(self, input_individuals, individuals, bags_values, extended_bags_values):
         """Computes covariance between latent individuals GP evaluated on input

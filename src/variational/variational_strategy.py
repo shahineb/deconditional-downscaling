@@ -26,8 +26,8 @@ class VariationalStrategy(variational.VariationalStrategy):
         induc_data_covar = full_covar[..., :num_induc, num_induc:].evaluate()
 
         # Use low rank square root approximation to evaluate input covariance
-        data_data_root_covar = data_data_covar.root_decomposition().root
-        data_data_covar = MatmulLazyTensor(data_data_root_covar, data_data_root_covar.t())
+        # data_data_root_covar = data_data_covar.root_decomposition().root
+        # data_data_covar = MatmulLazyTensor(data_data_root_covar, data_data_root_covar.t())
 
         # Compute interpolation terms
         # K_ZZ^{-1/2} K_ZX

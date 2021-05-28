@@ -1,8 +1,7 @@
-import torch
 from gpytorch.models import ExactGP
 from gpytorch.distributions import MultivariateNormal
 from .cme_process import CMEProcess
-from .cme_prediction_strategy import ExactCMEPredictionStrategy
+from .prediction_strategies import ExactCMEPredictionStrategy
 
 
 class ExactCMEProcess(ExactGP, CMEProcess):
@@ -24,32 +23,40 @@ class ExactCMEProcess(ExactGP, CMEProcess):
         likelihood (gpytorch.likelihoods.Likelihood): observation noise likelihood model
 
     """
-    def __init__(self, train_individuals, train_bags, train_aggregate_targets,
-                 individuals_mean, individuals_kernel,
-                 bag_kernel, bags_sizes, lbda, likelihood, extended_train_bags=None):
+    def __init__(self, train_individuals, extended_train_bags, train_bags, train_aggregate_targets,
+                 individuals_mean, individuals_kernel, bag_kernel,
+                 lbda, likelihood, use_individuals_noise=True):
 
         # Initialize exact GP model attributes
         super().__init__(train_inputs=train_bags,
                          train_targets=train_aggregate_targets,
                          likelihood=likelihood)
 
-        # Setup model attributes
-        self.train_individuals = train_individuals
-        self.train_bags = train_bags
-        self.train_aggregate_targets = train_aggregate_targets
+        # Register model tensor attributes
+        self.register_buffer('train_individuals', train_individuals)
+        self.register_buffer('train_bags', train_bags)
+        self.register_buffer('extended_train_bags', extended_train_bags)
+        self.register_buffer('train_aggregate_targets', train_aggregate_targets)
+
+        # Setup model mean/kernel attributes
         self.individuals_mean = individuals_mean
         self.individuals_kernel = individuals_kernel
         self.bag_kernel = bag_kernel
-        self.bags_sizes = bags_sizes
+        self.noise_kernel = None
+        if use_individuals_noise:
+            self._init_noise_kernel()
+
+        # Setup model auxilliary attributes
         self.lbda = lbda
-        self.extended_train_bags = torch.cat([bag_value.repeat(bag_size, 1)
-                                              for (bag_size, bag_value) in zip(bags_sizes, train_bags)]).squeeze()
 
         # Initialize CME aggregate mean and covariance functions
         self._init_cme_mean_covar_modules(individuals=self.train_individuals,
                                           extended_bags_values=self.extended_train_bags)
 
         # Initialize individuals posterior prediction strategy attribute
+        self.individuals_prediction_strategy = None
+
+    def _clear_cache(self):
         self.individuals_prediction_strategy = None
 
     def setup_individuals_prediction_strategy(self):
@@ -62,6 +69,13 @@ class ExactCMEProcess(ExactGP, CMEProcess):
                                                   'train_aggregate_targets': self.train_aggregate_targets,
                                                   'likelihood': self.likelihood}
         self.individuals_prediction_strategy = ExactCMEPredictionStrategy(**individuals_prediction_strategy_kwargs)
+
+    def _init_noise_kernel(self):
+        """Initializes individuals noise kernel with 0.6932 = softplus(0)
+            - default gpytorch likelihood noise value
+
+        """
+        super()._init_noise_kernel(raw_noise=0.)
 
     def update_cme_estimate_parameters(self):
         """Update values of parameters used for CME estimate in mean and
@@ -139,3 +153,17 @@ class ExactCMEProcess(ExactGP, CMEProcess):
         individuals_posterior = MultivariateNormal(mean=individuals_posterior_mean,
                                                    covariance_matrix=individuals_posterior_covar)
         return individuals_posterior
+
+    def to(self, *args, **kwargs):
+        self = super().to(*args, **kwargs)
+        self.mean_module.root_inv_bags_covar = self.mean_module.root_inv_bags_covar.to(*args, **kwargs)
+        self.covar_module.individuals_covar = self.covar_module.individuals_covar.to(*args, **kwargs)
+        self.covar_module.root_inv_bags_covar = self.covar_module.root_inv_bags_covar.to(*args, **kwargs)
+        return self
+
+    def cpu(self, *args, **kwargs):
+        self = super().cpu(*args, **kwargs)
+        self.mean_module.root_inv_bags_covar = self.mean_module.root_inv_bags_covar.cpu(*args, **kwargs)
+        self.covar_module.individuals_covar = self.covar_module.individuals_covar.cpu(*args, **kwargs)
+        self.covar_module.root_inv_bags_covar = self.covar_module.root_inv_bags_covar.cpu(*args, **kwargs)
+        return self

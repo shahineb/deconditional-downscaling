@@ -21,9 +21,6 @@ __pycache__/
 .pytest_cache/
 *.pyc
 /data
-/model_weights
-/test_image
-/test_output
 
 # Latex generated files
 *.aux

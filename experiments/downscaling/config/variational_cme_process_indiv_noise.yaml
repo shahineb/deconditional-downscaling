@@ -1,0 +1,90 @@
+################################################################################
+#   CONFIGURATIONS FOR STATISTICAL DOWNSCALING EXPERIMENT WITH VARIATIONAL CME PROCESS WITH INDIVIDUALS NOISE
+################################################################################
+
+
+# MODEL SPECIFICATIONS
+model:
+  # Name of model to use
+  name: 'variational_cme_process'
+
+  # CME regularization parameter
+  lbda: 0.00001
+
+  # Number of inducing points
+  n_inducing_points: 800
+
+  # Whether to use noised individuals model or not
+  use_individuals_noise: True
+
+  # Random seed for inducing points selection
+  seed: 42
+
+
+# DATASET
+dataset:
+  # Path to fields to load
+  path: 'experiments/downscaling/data/orog_clt_albisccp_pctisccp_ttop_lat360_lon720_195003.nc'
+
+  # Names of fields used as covariates
+  covariate_fields_names:
+    - 'orog'        # Surface Altitude
+    - 'albisccp'    # Cloud Albedo
+    - 'clt'         # Total Cloud Coverage
+
+  # Names of fields used as mediating covariates
+  bags_fields_names:
+    - 'pctisccp'    # Mean Cloud Top Pressure
+
+  # Name of field to use as target
+  target_field_name: 'ttop'   # Cloud Top Temperature
+
+  # Downsampling block size
+  block_size:
+    - 17             # height
+    - 17             # width
+
+  # Random seed for dataset generation
+  seed: 42
+
+
+
+# TRAINING
+training:
+  # Name of model to use
+  name: 'variational_cme_process'
+
+  # Fraction of missing bags
+  missing_bags_fraction: 0.5
+
+  # Whether to use noised individuals model or not
+  use_individuals_noise: True
+
+  # Learning rate
+  lr: 0.01
+
+  # Number of iterations
+  n_epochs: 701
+
+  # Batch size
+  batch_size: 64
+
+  # Number of samples used for batch CMO estimation
+  batch_size_cme: 400
+
+  # Weight of KL term in ELBO
+  beta: 1
+
+  # Plot end of epoch inference every n epoch
+  plot_every: 100
+
+  # Log end of epoch inference every n epoch
+  log_every: 5
+
+  # Random seed used to choose shuffle dataset
+  seed: 42
+
+
+
+# EVALUATION
+evaluation:

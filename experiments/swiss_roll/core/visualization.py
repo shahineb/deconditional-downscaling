@@ -2,7 +2,7 @@ import torch
 import matplotlib.pyplot as plt
 
 
-def plot_dataset(individuals, groundtruth_individuals, targets, aggregate_targets, bags_sizes, scatter_kwargs={}):
+def plot_dataset(individuals, extended_bags_values, groundtruth_individuals, targets, aggregate_targets, bags_sizes, scatter_kwargs={}):
     """Plots altogether views of the dataset to visualize how was it built
 
     Args:
@@ -35,11 +35,16 @@ def plot_dataset(individuals, groundtruth_individuals, targets, aggregate_target
 
     # Second - used bagging of the latter individuals
     ax = fig.add_subplot(2, 2, 2, projection='3d')
+    min_y, max_y = extended_bags_values.min(), extended_bags_values.max()
     ax.view_init(10, -100)
-    for x in individuals.split(bags_sizes):
+    for x, c in zip(individuals.split(bags_sizes), extended_bags_values.split(bags_sizes)):
         ax.scatter(x[:, 0],
                    x[:, 1],
                    x[:, 2],
+                   c=c,
+                   cmap='prism',
+                   vmin=min_y,
+                   vmax=max_y,
                    s=5)
     ax.set_title("Vertical bagging of individuals", fontsize=24)
 
@@ -51,7 +56,7 @@ def plot_dataset(individuals, groundtruth_individuals, targets, aggregate_target
                groundtruth_individuals[:, 2],
                c=targets,
                cmap='Spectral',
-               s=1)
+               s=5)
     ax.set_title("Swiss roll samples from groundtruth distribution", fontsize=24)
 
     # Fourth - resulting aggregate targets mapped to bags from 2nd plot
@@ -60,6 +65,8 @@ def plot_dataset(individuals, groundtruth_individuals, targets, aggregate_target
     ax.view_init(10, -100)
     ax.scatter(**scatter_kwargs,
                c=expanded_aggregate_targets,
+               vmin=targets.min(),
+               vmax=targets.max(),
                cmap='Spectral')
     ax.set_title("Bags colored by Aggregate Target", fontsize=24)
     return fig

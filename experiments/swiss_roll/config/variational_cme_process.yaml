@@ -9,10 +9,13 @@ model:
   name: 'variational_cme_process'
 
   # CME regularization parameter
-  lbda: 0.001
+  lbda: 0.0001
 
   # Number of inducing points
   n_inducing_points: 200
+
+  # Whether to use noised individuals model or not
+  use_individuals_noise: False
 
   # Random seed for inducing points selection
   seed: 42
@@ -20,17 +23,14 @@ model:
 
 # DATASET
 dataset:
+  # Number of points samples in swiss roll
+  n_samples: 5000
+
   # Number of bags
-  nbags: 50
+  n_bags: 50
 
-  # Mean size of sampled bags
-  mean_bag_size: 100
-
-  # Size standard deviation of sampled bags
-  std_bag_size: 50
-
-  # Number of samples to use in groundtruth manifold
-  n_samples_groundtruth: 10000
+  # Variance of noise to apply on aggregate targets
+  noise: 0.05
 
   # Random seed for dataset generation
   seed: 42
@@ -42,21 +42,27 @@ training:
   # Name of model to use
   name: 'variational_cme_process'
 
+  # Whether to use noised individuals model or not
+  use_individuals_noise: False
+
   # Learning rate
-  lr: 0.01
+  lr: 0.05
 
   # Number of iterations
-  n_epochs: 80
+  n_epochs: 300
 
   # Weight of KL term in ELBO
-  beta: 0.001
+  beta: 1
+
+  # Seed for dataset shuffling
+  seed: 42
 
 
 
 # EVALUATION
 evaluation:
   # Number of samples to use for NLL computation - doesn't scale
-  n_samples_nll: 2000
+  chunk_size_nll: 2000
 
   # Random seed for samples selection
   seed: 42

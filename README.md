@@ -1,50 +1,60 @@
-# Conditional Mean Embedding Process
-
-Code for [[to be inserted]] by Siu Chau, Shahine Bouabid and Dino Sejdinovic
-
+# Deconditional Downscaling with Gaussian Processes
 
 # Getting started
 
 _Fill with brief description and command to run for immediate try out of repo_
 
-- Run Swiss Roll Experiment
+- Run Swiss Roll experiment with matched dataset
 
 Pick one of the configuration files listed under
 ```
 experiments/swiss_roll/config/
 ├── exact_cme_process.yaml
-├── linear_interpolation.yaml
+├── bagged_gp.yaml
 ├── variational_cme_process.yaml
-└── vbagg.yaml
+├── vbagg.yaml
+└── gp_regression.yaml
 ```
-
 and run from root directory
 
 ```bash
 $ python experiments/swiss_roll/run_experiment.py --cfg=path/to/config/file --o=path/output/directory
 ```
 
+- Run Swiss Roll experiment with unmatched dataset
 
-# Repository structure
+Simply add `--unmatched` option to the above as
+```bash
+$ python experiments/swiss_roll/run_experiment.py --cfg=path/to/config/file --o=path/output/directory --unmatched
+```
 
-_Fill with description of repository structure_
+
+- Run Downscaling experiment
+
+Pick one of the configuration files listed under
+```
+experiments/downscaling/config/
+├── variational_cme_process_indiv_noise.yaml
+├── vbagg.yaml
+└── krigging.yaml
+```
+and run from root directory
+
+```bash
+$ python experiments/downscaling/run_experiment.py --cfg=path/to/config/file --o=path/output/directory
+```
+
 
 
 # Installation
 
-Code implemented in Python 3.8.7
+Code implemented in Python 3.8.0
 
 #### Setting up environment
 
-Clone and go to repository
-```bash
-$ git clone https://github.com/Chau999/ContBagGP.git
-$ cd ContBagGP
-```
-
 Create and activate environment
 ```bash
-$ pyenv virtualenv 3.8.7 venv
+$ pyenv virtualenv 3.8.0 venv
 $ pyenv activate venv
 $ (venv)
 ```
