@@ -2,6 +2,12 @@
 
 ## Getting started
 
+
+
+<p align="center">
+<img src="https://github.com/shahineb/deconditional-downscaling/docs/source/img/figure_1.png" alt="figure" width="400"/>
+ </p>
+
 - Run Swiss Roll experiment with matched dataset
 
 Pick one of the configuration files listed under
@@ -14,6 +20,7 @@ experiments/swiss_roll/config/
 └── gp_regression.yaml
 ```
 and run from root directory
+
 
 ```bash
 $ python experiments/swiss_roll/run_experiment.py --cfg=path/to/config/file --o=path/output/directory
