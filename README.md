@@ -7,7 +7,7 @@
 
 ## Getting started
 
-- Run Swiss Roll experiment with matched dataset
+- __Run Swiss Roll experiment with matched dataset__
 
 Pick one of the configuration files listed under
 ```
@@ -25,7 +25,7 @@ and run from root directory
 $ python experiments/swiss_roll/run_experiment.py --cfg=path/to/config/file --o=path/output/directory
 ```
 
-- Run Swiss Roll experiment with unmatched dataset
+- __Run Swiss Roll experiment with unmatched dataset__
 
 Simply add `--unmatched` option to the above as
 ```bash
@@ -33,7 +33,7 @@ $ python experiments/swiss_roll/run_experiment.py --cfg=path/to/config/file --o=
 ```
 
 
-- Run Downscaling experiment
+- __Run Downscaling experiment__
 
 Pick one of the configuration files listed under
 ```
