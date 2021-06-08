@@ -1,12 +1,11 @@
 # Deconditional Downscaling with Gaussian Processes
 
-## Getting started
-
-
 
 <p align="center">
-<img src="https://github.com/shahineb/deconditional-downscaling/docs/source/img/figure_1.png" alt="figure" width="400"/>
+<img src="https://github.com/shahineb/deconditional-downscaling/blob/main/docs/img/figure_1.png" alt="figure" width="300"/>
  </p>
+
+## Getting started
 
 - Run Swiss Roll experiment with matched dataset
 
