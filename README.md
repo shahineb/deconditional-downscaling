@@ -5,7 +5,7 @@
 
 
 <p align="center">
-<img src="https://github.com/shahineb/deconditional-downscaling/docs/source/img/figure_1.png" alt="figure" width="400"/>
+<img src="https://github.com/shahineb/deconditional-downscaling/docs/img/figure_1.png" alt="figure" width="400"/>
  </p>
 
 - Run Swiss Roll experiment with matched dataset
