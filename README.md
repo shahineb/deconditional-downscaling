@@ -49,6 +49,10 @@ $ python experiments/downscaling/run_experiment.py --cfg=path/to/config/file --o
 ```
 
 
+## TODO
+[ ] Update requirements
+[ ] Sanity check experiments
+
 
 ## Installation
 
