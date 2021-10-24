@@ -5,15 +5,15 @@ import torch
 import gpytorch
 import matplotlib.pyplot as plt
 from progress.bar import Bar
-from models import VariationalCMEProcess, CMEProcessLikelihood, BagVariationalELBO, RFFKernel, MODELS, TRAINERS, PREDICTERS
+from models import VariationalCMP, CMPLikelihood, BagVariationalELBO, RFFKernel, MODELS, TRAINERS, PREDICTERS
 from core.visualization import plot_downscaling_prediction
 from core.metrics import compute_metrics
 plt.rcParams['font.family'] = 'serif'
 plt.rcParams['font.serif'] = ['Times New Roman'] + plt.rcParams['font.serif']
 
 
-@MODELS.register('variational_cme_process')
-def build_downscaling_variational_cme_process(covariates_grid, lbda, n_inducing_points, use_individuals_noise, **kwargs):
+@MODELS.register('variational_cmp')
+def build_downscaling_variational_cmp(covariates_grid, lbda, n_inducing_points, use_individuals_noise, **kwargs):
     """Hard-coded initialization of Variational CME Process module used for downscaling experiment
 
     Args:
@@ -23,7 +23,7 @@ def build_downscaling_variational_cme_process(covariates_grid, lbda, n_inducing_
         seed (int)
 
     Returns:
-        type: VariationalCMEProcess
+        type: VariationalCMP
 
     """
     # Inverse softplus utility for gpytorch lengthscale intialization
@@ -62,19 +62,19 @@ def build_downscaling_variational_cme_process(covariates_grid, lbda, n_inducing_
     inducing_points = flattened_grid[offset:n_samples - offset:step].float()
 
     # Define model
-    model = VariationalCMEProcess(individuals_mean=individuals_mean,
-                                  individuals_kernel=individuals_kernel,
-                                  bag_kernel=bag_kernel,
-                                  inducing_points=inducing_points,
-                                  lbda=lbda,
-                                  use_individuals_noise=use_individuals_noise)
+    model = VariationalCMP(individuals_mean=individuals_mean,
+                           individuals_kernel=individuals_kernel,
+                           bag_kernel=bag_kernel,
+                           inducing_points=inducing_points,
+                           lbda=lbda,
+                           use_individuals_noise=use_individuals_noise)
     return model
 
 
-@TRAINERS.register('variational_cme_process')
-def train_downscaling_variational_cme_process(model, covariates_blocks, bags_blocks, extended_bags, targets_blocks, batch_size_cme,
-                                              lr, n_epochs, batch_size, beta, seed, dump_dir, device_idx, covariates_grid, missing_bags_fraction,
-                                              use_individuals_noise, groundtruth_field, target_field, plot, plot_every, log_every, **kwargs):
+@TRAINERS.register('variational_cmp')
+def train_downscaling_variational_cmp(model, covariates_blocks, bags_blocks, extended_bags, targets_blocks, batch_size_cme,
+                                      lr, n_epochs, batch_size, beta, seed, dump_dir, device_idx, covariates_grid, missing_bags_fraction,
+                                      use_individuals_noise, groundtruth_field, target_field, plot, plot_every, log_every, **kwargs):
     """Hard-coded training script of Exact CME Process for downscaling experiment
 
     Args:
@@ -136,7 +136,7 @@ def train_downscaling_variational_cme_process(model, covariates_blocks, bags_blo
             yield x, y, extended_y, z
 
     # Define variational CME process likelihood
-    likelihood = CMEProcessLikelihood(use_individuals_noise=use_individuals_noise)
+    likelihood = CMPLikelihood(use_individuals_noise=use_individuals_noise)
 
     # Set model in training mode
     model = model.train().to(device)
@@ -191,10 +191,10 @@ def train_downscaling_variational_cme_process(model, covariates_blocks, bags_blo
 
         if epoch % log_every == 0:
             # Compute posterior distribution at current epoch and store logs
-            individuals_posterior = predict_downscaling_variational_cme_process(model=model,
-                                                                                covariates_grid=covariates_grid,
-                                                                                mean_shift=mean_shift,
-                                                                                std_scale=std_scale)
+            individuals_posterior = predict_downscaling_variational_cmp(model=model,
+                                                                        covariates_grid=covariates_grid,
+                                                                        mean_shift=mean_shift,
+                                                                        std_scale=std_scale)
             epoch_logs = get_epoch_logs(model, likelihood, individuals_posterior, groundtruth_field)
             epoch_logs.update({'loss': epoch_loss / (len(targets_blocks) // batch_size)})
             logs[epoch + 1] = epoch_logs
@@ -253,8 +253,8 @@ def get_epoch_logs(model, likelihood, individuals_posterior, groundtruth_field):
     return epoch_logs
 
 
-@PREDICTERS.register('variational_cme_process')
-def predict_downscaling_variational_cme_process(model, covariates_grid, mean_shift, std_scale, **kwargs):
+@PREDICTERS.register('variational_cmp')
+def predict_downscaling_variational_cmp(model, covariates_grid, mean_shift, std_scale, **kwargs):
     # Set model in evaluation mode
     model.eval()
 

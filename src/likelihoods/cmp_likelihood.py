@@ -4,7 +4,7 @@ from gpytorch import lazy
 from gpytorch.likelihoods import GaussianLikelihood
 
 
-class CMEProcessLikelihood(GaussianLikelihood):
+class CMPLikelihood(GaussianLikelihood):
 
     def __init__(self, use_individuals_noise=True, **kwargs):
         super().__init__(**kwargs)

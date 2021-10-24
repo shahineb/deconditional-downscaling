@@ -1,24 +1,18 @@
 ################################################################################
-#   CONFIGURATIONS FOR SWISS ROLL EXPERIMENT WITH VARIATIONAL CME PROCESS
+#   CONFIGURATIONS FOR SWISS ROLL EXPERIMENT WITH EXACT CME PROCESS
 ################################################################################
 
 
 # MODEL SPECIFICATIONS
 model:
   # Name of model to use
-  name: 'variational_cme_process'
+  name: 'exact_cmp'
 
   # CME regularization parameter
-  lbda: 0.0001
-
-  # Number of inducing points
-  n_inducing_points: 200
+  lbda: 0.01
 
   # Whether to use noised individuals model or not
   use_individuals_noise: False
-
-  # Random seed for inducing points selection
-  seed: 42
 
 
 # DATASET
@@ -36,27 +30,16 @@ dataset:
   seed: 42
 
 
-
 # TRAINING
 training:
   # Name of model to use
-  name: 'variational_cme_process'
-
-  # Whether to use noised individuals model or not
-  use_individuals_noise: False
+  name: 'exact_cmp'
 
   # Learning rate
-  lr: 0.05
+  lr: 0.1
 
   # Number of iterations
-  n_epochs: 300
-
-  # Weight of KL term in ELBO
-  beta: 1
-
-  # Seed for dataset shuffling
-  seed: 42
-
+  n_epochs: 100
 
 
 # EVALUATION

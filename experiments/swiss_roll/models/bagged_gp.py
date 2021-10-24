@@ -21,7 +21,7 @@ def build_swiss_roll_bagged_gp(individuals, bags_sizes, aggregate_targets, **kwa
         use_individuals_noise (bool)
 
     Returns:
-        type: ExactCMEProcess
+        type: ExactCMP
 
     """
     # Inverse softplus utility for gpytorch lengthscale intialization
@@ -52,7 +52,7 @@ def train_swiss_roll_bagged_gp(model, lr, n_epochs,
     """Hard-coded training script of Exact CME Process for swiss roll experiment
 
     Args:
-        model (ExactCMEProcess)
+        model (ExactCMP)
         lr (float)
         n_epochs (int)
 

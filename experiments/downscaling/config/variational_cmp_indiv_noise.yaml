@@ -6,7 +6,7 @@
 # MODEL SPECIFICATIONS
 model:
   # Name of model to use
-  name: 'variational_cme_process'
+  name: 'variational_cmp'
 
   # CME regularization parameter
   lbda: 0.00001
@@ -52,7 +52,7 @@ dataset:
 # TRAINING
 training:
   # Name of model to use
-  name: 'variational_cme_process'
+  name: 'variational_cmp'
 
   # Fraction of missing bags
   missing_bags_fraction: 0.5

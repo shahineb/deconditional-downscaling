@@ -5,8 +5,8 @@ from src.means import CMEAggregateMean
 from src.kernels import CMEAggregateKernel, DeltaKernel
 
 
-class CMEProcess(ABC):
-    """General class interface methods common to variations of CME process"""
+class CMP(ABC):
+    """General class interface methods common to variations of CMP"""
 
     def _init_noise_kernel(self, raw_noise):
         """Initializes individuals noise kernel
@@ -19,7 +19,7 @@ class CMEProcess(ABC):
         self.noise_kernel = ScaleKernel(base_kernel=DeltaKernel())
         self.noise_kernel.initialize(raw_outputscale=raw_noise * torch.ones(1))
 
-    def _init_cme_mean_covar_modules(self, individuals, extended_bags_values):
+    def _init_cmp_mean_covar_modules(self, individuals, extended_bags_values):
         """Initializes CME aggregate mean and covariance modules based on provided
             individuals and bags values tensors
 
@@ -29,7 +29,7 @@ class CMEProcess(ABC):
         """
         # Evaluate tensors needed to compute CME estimate
         with torch.no_grad():
-            latent_individuals_mean, latent_individuals_covar, root_inv_bags_covar = self._get_cme_estimate_parameters(individuals=individuals,
+            latent_individuals_mean, latent_individuals_covar, root_inv_bags_covar = self._get_cmp_estimate_parameters(individuals=individuals,
                                                                                                                        extended_bags_values=extended_bags_values)
 
         # Initialize CME aggregate mean and covariance functions
@@ -45,8 +45,8 @@ class CMEProcess(ABC):
                                'root_inv_bags_covar': root_inv_bags_covar}
         self.covar_module = CMEAggregateKernel(**covar_module_kwargs)
 
-    def _get_cme_estimate_parameters(self, individuals, extended_bags_values):
-        """Computes tensors required to get an estimation of the CME
+    def _get_cmp_estimate_parameters(self, individuals, extended_bags_values):
+        """Computes tensors required to get an estimation of the CMP
 
         individuals (torch.Tensor): (N, d) tensor of individuals inputs
         extended_bags_values (torch.Tensor): (N, r) tensor of individuals bags values
@@ -67,15 +67,15 @@ class CMEProcess(ABC):
         root_inv_bags_covar = foo.root_inv_decomposition().root
         return latent_individuals_mean, latent_individuals_covar, root_inv_bags_covar
 
-    def update_cme_estimate_parameters(self, individuals, extended_bags_values):
-        """Update values of parameters used for CME estimate in mean and
+    def update_cmp_estimate_parameters(self, individuals, extended_bags_values):
+        """Update values of parameters used for CMP estimate in mean and
             covariance modules
 
         individuals (torch.Tensor): (N, d) tensor of individuals inputs
         extended_bags_values (torch.Tensor): (N, r) tensor of individuals bags values
 
         """
-        latent_individuals_mean, latent_individuals_covar, root_inv_bags_covar = self._get_cme_estimate_parameters(individuals=individuals,
+        latent_individuals_mean, latent_individuals_covar, root_inv_bags_covar = self._get_cmp_estimate_parameters(individuals=individuals,
                                                                                                                    extended_bags_values=extended_bags_values)
         self.mean_module.individuals_mean = self.individuals_mean(individuals)
         self.mean_module.bags_values = extended_bags_values
@@ -84,9 +84,9 @@ class CMEProcess(ABC):
         self.covar_module.individuals_covar = latent_individuals_covar
         self.covar_module.root_inv_bags_covar = root_inv_bags_covar
 
-    def get_individuals_to_cme_covar(self, input_individuals, individuals, bags_values, extended_bags_values):
+    def get_individuals_to_cmp_covar(self, input_individuals, individuals, bags_values, extended_bags_values):
         """Computes covariance between latent individuals GP evaluated on input
-            and CME aggregate process GP distribution on train data
+            and CMP GP distribution on train data
 
         Args:
             individuals (torch.Tensor): input individuals

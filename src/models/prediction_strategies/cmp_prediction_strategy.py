@@ -5,7 +5,7 @@ from gpytorch.models.exact_prediction_strategies import DefaultPredictionStrateg
 from gpytorch.utils.memoize import cached, clear_cache_hook
 
 
-class ExactCMEPredictionStrategy(DefaultPredictionStrategy):
+class ExactCMPPredictionStrategy(DefaultPredictionStrategy):
     """Implements computation of predictive posterior on individuals distribution
 
     Args:

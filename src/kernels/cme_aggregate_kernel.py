@@ -2,7 +2,7 @@ from gpytorch import kernels
 
 
 class CMEAggregateKernel(kernels.Kernel):
-    """Kernel of CME Process using CME to compute aggregation of covariance among
+    """Kernel of CMP using CME to compute aggregation of covariance among
         individuals
 
     Args:

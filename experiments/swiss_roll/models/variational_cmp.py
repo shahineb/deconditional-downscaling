@@ -4,13 +4,12 @@ import torch
 import gpytorch
 from sklearn.cluster import KMeans
 from progress.bar import Bar
-from models import VariationalCMEProcess, CMEProcessLikelihood, BagVariationalELBO, MODELS, TRAINERS, PREDICTERS
+from models import VariationalCMP, CMPLikelihood, BagVariationalELBO, MODELS, TRAINERS, PREDICTERS
 from core.metrics import compute_metrics, compute_chunked_nll
 
 
-@MODELS.register('variational_cme_process')
-def build_swiss_roll_variational_cme_process(n_inducing_points, lbda,
-                                             individuals, use_individuals_noise, seed, **kwargs):
+@MODELS.register('variational_cmp')
+def build_swiss_roll_variational_cmp(n_inducing_points, lbda, individuals, use_individuals_noise, seed, **kwargs):
     """Hard-coded initialization of Variational CME Process module used for swiss roll experiment
 
     Args:
@@ -23,7 +22,7 @@ def build_swiss_roll_variational_cme_process(n_inducing_points, lbda,
         seed (int)
 
     Returns:
-        type: VariationalCMEProcess
+        type: VariationalCMP
 
     """
     # Inverse softplus utility for gpytorch lengthscale intialization
@@ -48,19 +47,19 @@ def build_swiss_roll_variational_cme_process(n_inducing_points, lbda,
     inducing_points = torch.from_numpy(kmeans.cluster_centers_).float()
 
     # Define model
-    model = VariationalCMEProcess(individuals_mean=individuals_mean,
-                                  individuals_kernel=individuals_kernel,
-                                  bag_kernel=bag_kernel,
-                                  inducing_points=inducing_points,
-                                  lbda=lbda,
-                                  use_individuals_noise=use_individuals_noise)
+    model = VariationalCMP(individuals_mean=individuals_mean,
+                           individuals_kernel=individuals_kernel,
+                           bag_kernel=bag_kernel,
+                           inducing_points=inducing_points,
+                           lbda=lbda,
+                           use_individuals_noise=use_individuals_noise)
     return model
 
 
-@TRAINERS.register('variational_cme_process')
-def train_swiss_roll_variational_cme_process(model, individuals, extended_bags_values, bags_values, aggregate_targets,
-                                             use_individuals_noise, lr, n_epochs, beta, seed,
-                                             groundtruth_individuals, groundtruth_targets, device_idx, chunk_size, dump_dir, **kwargs):
+@TRAINERS.register('variational_cmp')
+def train_swiss_roll_variational_cmp(model, individuals, extended_bags_values, bags_values, aggregate_targets,
+                                     use_individuals_noise, lr, n_epochs, beta, seed,
+                                     groundtruth_individuals, groundtruth_targets, device_idx, chunk_size, dump_dir, **kwargs):
     """Hard-coded training script of Variational CME Process for swiss roll experiment
 
     Args:
@@ -82,7 +81,7 @@ def train_swiss_roll_variational_cme_process(model, individuals, extended_bags_v
     groundtruth_targets = groundtruth_targets.to(device)
 
     # Define variational CME process likelihood
-    likelihood = CMEProcessLikelihood(use_individuals_noise=use_individuals_noise)
+    likelihood = CMPLikelihood(use_individuals_noise=use_individuals_noise)
 
     # Set model in training mode
     model = model.train().to(device)
@@ -155,14 +154,14 @@ def get_epoch_logs(model, likelihood, groundtruth_individuals, groundtruth_targe
     model.eval()
 
     # Compute individuals posterior on groundtruth distorted swiss roll
-    individuals_posterior = predict_swiss_roll_variational_cme_process(model=model,
-                                                                       individuals=groundtruth_individuals)
+    individuals_posterior = predict_swiss_roll_variational_cmp(model=model,
+                                                               individuals=groundtruth_individuals)
     # Compute MSE, MAE, MB
     epoch_logs = compute_metrics(individuals_posterior=individuals_posterior, groundtruth_targets=groundtruth_targets)
 
     # Compute chunked approximation of NLL
     nll = compute_chunked_nll(groundtruth_individuals=groundtruth_individuals, groundtruth_targets=groundtruth_targets,
-                              chunk_size=chunk_size, model=model, predict=predict_swiss_roll_variational_cme_process)
+                              chunk_size=chunk_size, model=model, predict=predict_swiss_roll_variational_cmp)
     epoch_logs.update({'nll': nll})
 
     # Record model hyperparameters
@@ -183,13 +182,13 @@ def get_epoch_logs(model, likelihood, groundtruth_individuals, groundtruth_targe
     return epoch_logs
 
 
-@PREDICTERS.register('variational_cme_process')
-def predict_swiss_roll_variational_cme_process(model, individuals, **kwargs):
+@PREDICTERS.register('variational_cmp')
+def predict_swiss_roll_variational_cmp(model, individuals, **kwargs):
     """Hard-coded prediciton of individuals posterior for Variational CME Process on
     swiss roll experiment
 
     Args:
-        model (VariationalCMEProcess): in evaluation mode
+        model (VariationalCMP): in evaluation mode
         individuals (torch.Tensor)
 
     Returns:

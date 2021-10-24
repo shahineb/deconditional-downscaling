@@ -1,11 +1,11 @@
 from gpytorch.models import ExactGP
 from gpytorch.distributions import MultivariateNormal
-from .cme_process import CMEProcess
-from .prediction_strategies import ExactCMEPredictionStrategy
+from .cme_process import CMP
+from .prediction_strategies import ExactCMPPredictionStrategy
 
 
-class ExactCMEProcess(ExactGP, CMEProcess):
-    """Class implementing exact formulation of CME Process, suitable for small datasets
+class ExactCMP(ExactGP, CMP):
+    """Class implementing exact formulation of CMP, suitable for small datasets
 
     Args:
         train_individuals (torch.Tensor): (N, d) tensor of individuals inputs used
@@ -50,7 +50,7 @@ class ExactCMEProcess(ExactGP, CMEProcess):
         self.lbda = lbda
 
         # Initialize CME aggregate mean and covariance functions
-        self._init_cme_mean_covar_modules(individuals=self.train_individuals,
+        self._init_cmp_mean_covar_modules(individuals=self.train_individuals,
                                           extended_bags_values=self.extended_train_bags)
 
         # Initialize individuals posterior prediction strategy attribute
@@ -68,7 +68,7 @@ class ExactCMEProcess(ExactGP, CMEProcess):
                                                   'train_aggregate_prior_dist': train_aggregate_prior_dist,
                                                   'train_aggregate_targets': self.train_aggregate_targets,
                                                   'likelihood': self.likelihood}
-        self.individuals_prediction_strategy = ExactCMEPredictionStrategy(**individuals_prediction_strategy_kwargs)
+        self.individuals_prediction_strategy = ExactCMPPredictionStrategy(**individuals_prediction_strategy_kwargs)
 
     def _init_noise_kernel(self):
         """Initializes individuals noise kernel with 0.6932 = softplus(0)
@@ -77,7 +77,7 @@ class ExactCMEProcess(ExactGP, CMEProcess):
         """
         super()._init_noise_kernel(raw_noise=0.)
 
-    def update_cme_estimate_parameters(self):
+    def update_cmp_estimate_parameters(self):
         """Update values of parameters used for CME estimate in mean and
             covariance modules
 
@@ -85,10 +85,10 @@ class ExactCMEProcess(ExactGP, CMEProcess):
         extended_bags_values (torch.Tensor): (N, r) tensor of individuals bags values
 
         """
-        return super().update_cme_estimate_parameters(individuals=self.train_individuals,
+        return super().update_cmp_estimate_parameters(individuals=self.train_individuals,
                                                       extended_bags_values=self.extended_train_bags)
 
-    def get_individuals_to_cme_covar(self, input_individuals):
+    def get_individuals_to_cmp_covar(self, input_individuals):
         """Computes covariance between latent individuals GP evaluated on input
             and CME aggregate process GP distribution on train data
 
@@ -99,7 +99,7 @@ class ExactCMEProcess(ExactGP, CMEProcess):
             type: torch.Tensor
 
         """
-        return super().get_individuals_to_cme_covar(input_individuals=input_individuals,
+        return super().get_individuals_to_cmp_covar(input_individuals=input_individuals,
                                                     individuals=self.train_individuals,
                                                     bags_values=self.train_bags,
                                                     extended_bags_values=self.extended_train_bags)
@@ -141,7 +141,7 @@ class ExactCMEProcess(ExactGP, CMEProcess):
         individuals_covar = self.individuals_kernel(individuals)
 
         # Compute covariance of latent individual with CME aggregate process
-        individuals_to_cme_covar = self.get_individuals_to_cme_covar(individuals)
+        individuals_to_cme_covar = self.get_individuals_to_cmp_covar(individuals)
 
         # Compute predictive mean and covariance
         individuals_posterior_mean = self.individuals_prediction_strategy.exact_predictive_mean(individuals_mean=individuals_mean,

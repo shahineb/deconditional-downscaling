@@ -2,11 +2,11 @@ import torch
 from gpytorch import distributions
 from gpytorch.models import ApproximateGP
 from gpytorch import variational
-from .cme_process import CMEProcess
+from .cme_process import CMP
 from src.variational import VariationalStrategy
 
 
-class VariationalCMEProcess(ApproximateGP, CMEProcess):
+class VariationalCMP(ApproximateGP, CMP):
     """Sparse Variational Kernel Conditional Mean Process
 
     Args:

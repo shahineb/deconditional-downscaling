@@ -1,5 +1,5 @@
-from src.models import ExactGP, VariationalGP, ExactCMEProcess, BaggedGP, VariationalCMEProcess
-from src.likelihoods import CMEProcessLikelihood, VBaggGaussianLikelihood
+from src.models import ExactGP, VariationalGP, ExactCMP, BaggedGP, VariationalCMP
+from src.likelihoods import CMPLikelihood, VBaggGaussianLikelihood
 from src.mlls import BagVariationalELBO
 from src.utils import Registry
 """
@@ -24,8 +24,8 @@ def predict(cfg):
     return prediction
 
 
-from .exact_cme_process import *
+from .exact_cmp import *
 from .bagged_gp import *
-from .variational_cme_process import *
+from .variational_cmp import *
 from .vbagg import *
 from .gp_regression import *

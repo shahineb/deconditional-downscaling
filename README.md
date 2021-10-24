@@ -12,9 +12,9 @@
 Pick one of the configuration files listed under
 ```
 experiments/swiss_roll/config/
-├── exact_cme_process.yaml
+├── exact_cmp.yaml
 ├── bagged_gp.yaml
-├── variational_cme_process.yaml
+├── variational_cmp.yaml
 ├── vbagg.yaml
 └── gp_regression.yaml
 ```
@@ -38,7 +38,7 @@ $ python experiments/swiss_roll/run_experiment.py --cfg=path/to/config/file --o=
 Pick one of the configuration files listed under
 ```
 experiments/downscaling/config/
-├── variational_cme_process_indiv_noise.yaml
+├── variational_cmp_indiv_noise.yaml
 ├── vbagg.yaml
 └── krigging.yaml
 ```
@@ -66,4 +66,16 @@ $ (venv)
 Install dependencies
 ```bash
 $ (venv) pip install -r requirements.txt
+```
+
+
+
+## Reference
+```
+@inproceedings{ChaBouSej2021,
+  title = {{Deconditional Downscaling with Gaussian Processes}},
+  author = {Chau, Siu Lun and Bouabid, Shahine and Sejdinovic, Dino},
+  year = {2021},
+  booktitle = {Advances in Neural Information Processing Systems (NeurIPS)}
+}
 ```
