@@ -1,6 +1,6 @@
 from gpytorch.models import ExactGP
 from gpytorch.distributions import MultivariateNormal
-from .cme_process import CMP
+from .cmp import CMP
 from .prediction_strategies import ExactCMPPredictionStrategy
 
 
