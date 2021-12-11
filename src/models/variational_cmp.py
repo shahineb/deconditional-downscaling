@@ -2,7 +2,7 @@ import torch
 from gpytorch import distributions
 from gpytorch.models import ApproximateGP
 from gpytorch import variational
-from .cme_process import CMP
+from .cmp import CMP
 from src.variational import VariationalStrategy
 
 
