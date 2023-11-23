@@ -23,7 +23,7 @@ def predict(cfg):
     prediction = PREDICTERS[cfg['name']](**cfg)
     return prediction
 
-
+from .exact_cmp_mz import *
 from .exact_cmp import *
 from .bagged_gp import *
 from .variational_cmp import *
