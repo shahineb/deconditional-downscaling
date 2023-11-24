@@ -6,20 +6,12 @@ from progress.bar import Bar
 from models import ExactCMP, MODELS, TRAINERS, PREDICTERS
 from core.metrics import compute_metrics, compute_chunked_nll
 
-class LogTransformedRBFKernel(gpytorch.kernels.Kernel):
-    def __init__(self):
-        super(LogTransformedRBFKernel, self).__init__()
-        self.register_parameter(name="raw_lengthscale", parameter=torch.nn.Parameter(torch.zeros(1)))
-        self.base_kernel = gpytorch.kernels.RBFKernel()
 
-    @property
-    def lengthscale(self):
-        return self.raw_lengthscale.abs().add(1e-9)  # Avoids issues with non-positive values
-
+class LogTransformedRBFKernel(gpytorch.kernels.RBFKernel):
     def forward(self, x1, x2, **params):
         x1_transformed = torch.log(x1 / (1 - x1))
         x2_transformed = torch.log(x2 / (1 - x2))
-        return self.base_kernel(x1_transformed, x2_transformed, **params)
+        return super().forward(x1_transformed, x2_transformed, **params)
 
 
 @MODELS.register('exact_cmp_mz')

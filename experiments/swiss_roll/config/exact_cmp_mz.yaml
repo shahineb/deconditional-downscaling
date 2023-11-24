@@ -9,7 +9,7 @@ model:
   name: 'exact_cmp_mz'
 
   # CME regularization parameter
-  lbda: 0.01
+  lbda: 0.1
 
   # Whether to use noised individuals model or not
   use_individuals_noise: False
