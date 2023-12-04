@@ -9,8 +9,8 @@ from core.metrics import compute_metrics, compute_chunked_nll
 
 class LogTransformedRBFKernel(gpytorch.kernels.RBFKernel):
     def forward(self, x1, x2, **params):
-        x1_transformed = torch.log(x1 / (1 - x1))
-        x2_transformed = torch.log(x2 / (1 - x2))
+        x1_transformed = torch.log((1 + x1) / (2 - x1))
+        x2_transformed = torch.log((1 + x2) / (2 - x2))
         return super().forward(x1_transformed, x2_transformed, **params)
 
 
